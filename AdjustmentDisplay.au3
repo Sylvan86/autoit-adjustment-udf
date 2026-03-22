@@ -281,6 +281,7 @@ EndFunc
 ; Example .......: No
 ; ===============================================================================================================================
 Func __adj_displayGetValue($mRes, $sCol, $sKey, $sTableType, ByRef $mSystem)
+	#forceref $mSystem
 	Switch $sCol
 		Case "value"
 			If $sTableType = "param" Then

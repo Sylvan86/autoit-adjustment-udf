@@ -110,7 +110,7 @@ Func __adj_initWeights(ByRef $mSystem)
 
 		; determine weights of the observations pᵢ = 1/σᵢ²
 		; weights are only set once here (first run); VKS-loop updates them via σ̂²_k factor
-		Local $mVarComps = $mSystem.VarianceComponents, $sVarComp, $mObs
+		$mVarComps = $mSystem.VarianceComponents
 		For $sObsName in MapKeys($mObservations)
 			$mObs = $mObservations[$sObsName]
 			If Not MapExists($mObs, "weight") Then
@@ -147,7 +147,7 @@ EndFunc
 ; ===============================================================================================================================
 Func __adj_parseFormulas(ByRef $mSystem)
 	Local $mModel = $mSystem.model
-	Local $iF, $iP, $aParams, $iC, $sFormula, $fValue, $aObs, $sExecutable, $sObsName
+	Local $iF, $iP, $aParams, $iC, $sFormula, $fValue, $aObs, $sExecutable
 	Local $mDerivRaw, $mDerivExec, $sDKey, $sDeriv, $sFixedKey
 	Local $aFormulas     = $mModel.formulas
 	Local $aRestrictions = $mModel.restrictions
@@ -603,7 +603,7 @@ Func __adj_allocateMatrices(ByRef $mSystem)
 	If MapExists($mModel, "vceGroupOffsets") Then $mState.vceGroupOffsets = $mModel.vceGroupOffsets
 
 	; create vector of parameter values x0
-	Local $mx0, $tx0, $ml0, $mParams = $mModel.params, $iParam, $mIdxParams = $mModel.idxParams, $mResults
+	Local $mx0, $tx0, $mParams = $mModel.params, $iParam, $mIdxParams = $mModel.idxParams, $mResults
 	If $mModel.nParams > 0 Then
 		$mx0 = _blas_createVector($mModel.nParams)
 		$tx0 = $mx0.struct
