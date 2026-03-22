@@ -123,6 +123,8 @@ Func __adj_estimateVCE(ByRef $mSystem, ByRef $mState)
 		Local $mVecV = $mState.r
 		Local $mVecR = $mResults.redundancyDiag
 		Local $bConverged = True
+		Local $fVtPV, $fRedundancySum, $fSigmaSq, $bClipped
+		Local $mGrp[]
 
 		; === Generalized VKS: block-diagonal Σₗₗ ===
 		If $mState.hasCovariances Then
@@ -233,10 +235,11 @@ Func __adj_estimateVCE(ByRef $mSystem, ByRef $mState)
 		$mIdxObs = $mState.idxObs
 
 		For $sGroup In MapKeys($mGroupIndices)
-			Local $aIdx = $mGroupIndices[$sGroup]
+			$aIdx = $mGroupIndices[$sGroup]
 
 			; compute group redundancy sum rₖ and vₖᵀPₖvₖ
-			Local $fRedundancySum = 0, $fVtPV = 0
+			$fRedundancySum = 0
+			$fVtPV = 0
 			For $j = 0 To UBound($aIdx) - 1
 				Local $iIdx = $aIdx[$j]
 				$fRedundancySum += __adj_vecGet($mVecR, $iIdx)
@@ -247,19 +250,18 @@ Func __adj_estimateVCE(ByRef $mSystem, ByRef $mState)
 			Next
 
 			; variance component estimate σ̂²_k = vₖᵀPₖvₖ / rₖ
-			Local $fSigmaSq = 1.0
+			$fSigmaSq = 1.0
 			If $fRedundancySum > 1e-10 Then
 				$fSigmaSq = $fVtPV / $fRedundancySum
 			EndIf
 
 			; protection against negative/very small variance estimates (Step 6.3)
-			Local $bClipped = ($fSigmaSq < $__ADJ_VCE_MIN_SIGMA2)
+			$bClipped = ($fSigmaSq < $__ADJ_VCE_MIN_SIGMA2)
 			If $bClipped Then
 				$fSigmaSq = 1.0
 			EndIf
 
 			; store per-group VCE results (overwritten each iteration, final values kept)
-			Local $mGrp[]
 			$mGrp.s0      = Sqrt($fSigmaSq)
 			$mGrp.sigma2  = $fSigmaSq
 			$mGrp.vtpv    = $fVtPV
@@ -542,7 +544,7 @@ Func __adj_solveNonlinear(ByRef $mSystem, ByRef $mState)
 
 		Local $fR2sumPrev = 0  ; for CLS/GLM convergence test (relative residual change)
 		Local $bIsCLS = StringRegExp($mState.modelType, 'CLS$')
-		Local $bIsGLM = StringRegExp($mState.modelType, 'GLM$')
+		$bIsGLM = StringRegExp($mState.modelType, 'GLM$')
 		Local $fMaxDxPrev = 1e308, $iStagnation = 0
 
 		For $i = 1 To $iMaxIterations
@@ -824,8 +826,8 @@ Func __adj_computeJacobians(ByRef $mSystem, ByRef $mState, $sDeriveMethod = Defa
 
 			; process the parameter jacobian for the restrictions into Matrix_RA (null-space projection)
 			If $mState.nRestrictions > 0 Then
-				Local $mRA       = $mState.Matrix_RA, _
-					  $tRA_struct = $mRA.struct
+				$mRA       = $mState.Matrix_RA
+				$tRA_struct = $mRA.struct
 				_la_clear($mRA)
 
 				$idxF = 1
@@ -951,6 +953,7 @@ Func __adj_computeContradiction(ByRef $mSystem, ByRef $mState, $bInvert = False,
 		Next
 	EndIf
 	Local $mPar = $mModel.params
+	#forceref $mObs, $mPar
 
 	Local $mW    = $mState.Vector_W,  _
 	      $tW    = $mW.struct,         _
@@ -1024,8 +1027,8 @@ Func __adj_applyWhitening(ByRef $mState)
 
 
 	; dimensions
-	Local $iM = $mState.nObs, $iN = $mState.nParams, $iR = $mState.nRestrictions, $iFormulas = $mState.nFormulas, $iF = $iM + $iR - $iN, _
-	      $mL, $mTmp, $mA, $mB
+	Local $iM = $mState.nObs, _
+	      $mL, $mTmp, $mA, $mB, $mStdDevs
 ;~ 	Local $mS, $mD, $mV, $mC
 
 	Switch $mState.modelType
@@ -1142,7 +1145,7 @@ Func __adj_applyWhitening(ByRef $mState)
 			; B' = B · L  (TRMM, SIDE=R) — analogous to WGLM: B' = B·diag(σ)
 			; This transforms min ‖ṽ‖₂² into min vᵀPv where ṽ = L⁻¹·v
 			$mB = $mState.Matrix_B
-			Local $mCholL = $mState.CovCholeskyL
+			$mCholL = $mState.CovCholeskyL
 
 			; B' = B · L: TRMM with SIDE=R, UPLO=L, TRANS=N
 			; B has dimension (nFormulas+nRestrictions) × nObs, L is nObs × nObs
@@ -1198,7 +1201,7 @@ EndFunc
 ; Example .......: No
 ; ===============================================================================================================================
 Func __adj_solveOLS(ByRef $mState)
-	Local $iM = $mState.nObs, $iN = $mState.nParams, $mXd, $mW
+	Local $iN = $mState.nParams, $mXd, $mW
 
 	; Ordinary Least Squares: f(x) = y
 	; Adjustment by indirect observations
@@ -1988,7 +1991,7 @@ EndFunc
 ; Author ........: AspirinJunkie
 ; ===============================================================================================================================
 Func __adj_updateObservations(ByRef $mState)
-
+	#forceref $mState
 EndFunc
 
 #EndRegion ; Iteration finalization
@@ -2501,7 +2504,7 @@ Func __adj_derivate1D($sFunc, $sParam, $fValue = Default, $mPar = Default, $mObs
 				Return ($fB - $fA) / $fH
 
 			Case "Ridder"
-				Local $fD1, $fD2, $fD3, $fErr, $fErrOld = 1e100
+				$fErrOld = 1e100
 
 				$fStep = $fInitialH_Ridder
 
@@ -2541,8 +2544,8 @@ Func __adj_derivate1D($sFunc, $sParam, $fValue = Default, $mPar = Default, $mObs
 
 			Case "Higham"
 				; initial parameters
-				Local $fTargetError = $f_LA_DBL_EPS^(6/7) ; 6/7 correct digits for double type
-				Local $fError = 1e100
+				$fTargetError = $f_LA_DBL_EPS^(6/7) ; 6/7 correct digits for double type
+				$fError = 1e100
 				$fStep = $fH
 
 				; first derivation
@@ -2550,10 +2553,10 @@ Func __adj_derivate1D($sFunc, $sParam, $fValue = Default, $mPar = Default, $mObs
 				$fA = Execute($sFunc)
 				$mPar[$sParam] = $fValue - $fStep
 				$fB = Execute($sFunc)
-				Local $fD = ($fA - $fB) / (2 * $fStep)
+				$fD = ($fA - $fB) / (2 * $fStep)
 
 				; iterative refinement
-				Local $fDprev = $fD
+				$fDprev = $fD
 				For $i = 0 To $iIterationLimit
 					$fStep = $fStep / 2
 

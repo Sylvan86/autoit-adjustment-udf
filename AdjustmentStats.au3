@@ -250,14 +250,14 @@ Func __adj_computeQxx(ByRef $mSystem, ByRef $mState)
 	_lp_lapmt($mRinvT, $tJPVT_copy, False, $iN, $iN, $iN)
 
 	; 6. Transpose → S = P · R⁻¹
-	Local $mS = _la_transpose($mRinvT)
+	$mS = _la_transpose($mRinvT)
 
 	; Jacobi-Equilibration back-transform: scale S rows by 1/S_eq
 	; so that Qxx = S_scaled · S_scaledᵀ = diag(S⁻¹) · Qxx_eq · diag(S⁻¹)
 	; Only for QR branch — SVD branch uses pre-equilibration A_orig (no scaling needed)
 	If MapExists($mState, "EquilibrationScale") Then
-		Local $mEqScale = $mState.EquilibrationScale
-		Local $tEqS = $mEqScale.struct
+		$mEqScale = $mState.EquilibrationScale
+		$tEqS = $mEqScale.struct
 		; S is n×n (OLS/GLM) or nFree×nFree (LSE) — scale each row i by 1/S_eq_i
 		For $__i = 0 To $iN - 1
 			_blas_scal($mS, 1.0 / DllStructGetData($tEqS, 1, $__i + 1), $__i, $iN, $iN)
@@ -267,12 +267,12 @@ Func __adj_computeQxx(ByRef $mSystem, ByRef $mState)
 	; 7. Qxx = S · Sᵀ (symmetric rank-k update)
 	If MapExists($mState, "Q2") Then
 		; LSE / GLM+Restrictions back-transformation: Qxx = Q₂ · S · Sᵀ · Q₂ᵀ = T · Tᵀ  where T = Q₂ · S
-		Local $iNpar = $mState.nParams
-		Local $mQ2 = $mState.Q2
-		Local $mT = _blas_createMatrix($iNpar, $iN)
+		$iNpar = $mState.nParams
+		$mQ2 = $mState.Q2
+		$mT = _blas_createMatrix($iNpar, $iN)
 		_blas_gemm($mQ2, $mS, $mT, 1, 0, "N", "N", $iNpar, $iN, $iN)
 
-		Local $mQxx = _blas_createMatrix($iNpar, $iNpar)
+		$mQxx = _blas_createMatrix($iNpar, $iNpar)
 		_blas_syrk($mT, $mQxx, 1, 0, "U", "N", $iNpar, $iN)
 
 		; fill lower triangle from upper (for symmetric display/access)
@@ -283,7 +283,7 @@ Func __adj_computeQxx(ByRef $mSystem, ByRef $mState)
 		Return $mT  ; return T for cofactor matrix computation
 	Else
 		; OLS/GLM: Qxx = S · Sᵀ directly
-		Local $mQxx = _blas_createMatrix($iN, $iN)
+		$mQxx = _blas_createMatrix($iN, $iN)
 		_blas_syrk($mS, $mQxx, 1, 0, "U", "N", $iN, $iN)
 
 		__adj_fillLowerFromUpper($mQxx, $iN)
@@ -432,7 +432,7 @@ Func __adj_computeCofactors(ByRef $mSystem, ByRef $mState, $mS)
 		; ══════ GLM: Qvv via hat matrix in equation space ══════
 		Local $mBglm = $mState.B_orig
 		Local $mCholeskyM = $mState.CholeskyM
-		Local $iMeq = $mState.nFormulas
+		$iMeq = $mState.nFormulas
 		Local $iNpar = $mState.nParams
 		Local $iScols = $mS.cols  ; nParams (no restrictions) or nFree (with restrictions, S = T = Q2·S)
 
@@ -465,7 +465,7 @@ Func __adj_computeCofactors(ByRef $mSystem, ByRef $mState, $mS)
 		_blas_gemm($mIH, $mT_glm, $mTemp, 1, 0, "N", "N", $iMeq, $iPobs, $iMeq)
 
 		; Qvv_w = Tᵀ · Temp (pobs × pobs)
-		Local $mQvv = _blas_createMatrix($iPobs, $iPobs)
+		$mQvv = _blas_createMatrix($iPobs, $iPobs)
 		_blas_gemm($mT_glm, $mTemp, $mQvv, 1, 0, "T", "N", $iPobs, $iPobs, $iMeq)
 
 		; back-transformation: Qvv = diag(σ)·Qvv_w·diag(σ) or L·Qvv_w·Lᵀ
@@ -478,7 +478,7 @@ Func __adj_computeCofactors(ByRef $mSystem, ByRef $mState, $mS)
 		$mResults.Qvv = $mQvv
 
 		; Qŷ = P⁻¹ - Qvv
-		Local $mQyhat = _la_duplicate($mQvv)
+		$mQyhat = _la_duplicate($mQvv)
 		_la_scale($mQyhat, -1, True)
 		If StringRegExp($sModel, "^G(?!LM)") Then
 			_blas_axpy($mState.Matrix_Sigma, $mQyhat, 1, 0, 0, 1, 1, $iPobs * $iPobs)
@@ -500,7 +500,7 @@ Func __adj_computeCofactors(ByRef $mSystem, ByRef $mState, $mS)
 		_blas_gemm($mA, $mS, $mU, 1, 0, "N", "N", $iM, $iNcols, $mS.rows, $mA.rows)
 
 		; Qŷ_w = U · Uᵀ (m × m, symmetric) — in whitened space for WLS/WLSE
-		Local $mQyhat = _blas_createMatrix($iM, $iM)
+		$mQyhat = _blas_createMatrix($iM, $iM)
 		_blas_syrk($mU, $mQyhat, 1, 0, "U", "N", $iM, $iNcols)
 		__adj_fillLowerFromUpper($mQyhat, $iM)
 
@@ -514,7 +514,7 @@ Func __adj_computeCofactors(ByRef $mSystem, ByRef $mState, $mS)
 		$mResults.Qyhat = $mQyhat
 
 		; Qvv = P⁻¹ - Qŷ
-		Local $mQvv = _la_duplicate($mQyhat)
+		$mQvv = _la_duplicate($mQyhat)
 		_la_scale($mQvv, -1, True)
 		If StringRegExp($sModel, "^G(?!LM)") Then
 			_blas_axpy($mState.Matrix_Sigma, $mQvv, 1, 0, 0, 1, 1, $iM * $iM)
@@ -629,7 +629,6 @@ EndFunc
 Func __adj_addDiagVariance(ByRef $mMatrix, $mStdDevVec, $iN)
 	Local $tSigma = $mStdDevVec.struct
 	Local $tM = $mMatrix.struct
-	Local $iElemSize = ($mMatrix.datatype = "DOUBLE") ? 8 : 4
 	For $i = 0 To $iN - 1
 		Local $fSigma = DllStructGetData($tSigma, 1, $i + 1)
 		Local $iPos = $i * $iN + $i + 1  ; diagonal position (1-indexed for DllStructGetData)

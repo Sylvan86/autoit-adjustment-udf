@@ -1188,6 +1188,7 @@ EndFunc
 ; Author ........: AspirinJunkie
 ; ===============================================================================================================================
 Func __adj_createNewSystem($fS0 = 1)
+	#forceref $fS0
 	Local $mRet[], $mEmpty[], $aEmpty[0]
 
 	; model sub-map (user input data)
@@ -1249,7 +1250,7 @@ Func __adj_parseDerivativeInput($vInput)
 			If $sPart = "" Then ContinueLoop
 			$iEq = StringInStr($sPart, "=")
 			If $iEq < 2 Then ContinueLoop
-			Local $sKey = StringStripWS(StringLeft($sPart, $iEq - 1), 3)
+			$sKey = StringStripWS(StringLeft($sPart, $iEq - 1), 3)
 			Local $sVal = StringStripWS(StringMid($sPart, $iEq + 1), 3)
 			If $sKey <> "" And $sVal <> "" Then $mResult[StringUpper($sKey)] = StringUpper($sVal)
 		Next
