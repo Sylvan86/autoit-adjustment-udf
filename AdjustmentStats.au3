@@ -244,7 +244,7 @@ Func __adj_computeQxx(ByRef $mSystem, ByRef $mState)
 	Local $tJPVT = $mState.JPVT
 	Local $iBytes = DllStructGetSize($tJPVT)
 	Local $tJPVT_copy = DllStructCreate("INT[" & $iN & "]")
-	DllCall("kernel32.dll", "NONE", "RtlCopyMemory", "PTR", DllStructGetPtr($tJPVT_copy), "PTR", DllStructGetPtr($tJPVT), "ULONG_PTR", $iBytes)
+	DllCall("kernel32.dll", "NONE", "RtlMoveMemory", "PTR", DllStructGetPtr($tJPVT_copy), "PTR", DllStructGetPtr($tJPVT), "ULONG_PTR", $iBytes)
 
 	; 5. Column permutation: R⁻ᵀ · Pᵀ (backward permutation)
 	_lp_lapmt($mRinvT, $tJPVT_copy, False, $iN, $iN, $iN)
