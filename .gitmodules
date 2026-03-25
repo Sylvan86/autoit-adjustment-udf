@@ -1,3 +1,4 @@
 [submodule "linearalgebra"]
 	path = linearalgebra
 	url = https://github.com/Sylvan86/autoit-linearalgebra-udf.git
+	branch = master
