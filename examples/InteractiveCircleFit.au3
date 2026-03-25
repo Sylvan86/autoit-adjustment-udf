@@ -23,7 +23,7 @@
 #include <WindowsConstants.au3>
 #include "..\Adjustment.au3"
 
-; --- Layout ---
+; --- Layout ---	
 Global Const $g_iCanvasW  = 700
 Global Const $g_iCanvasH  = 550
 Global Const $g_iPanelW   = 230
@@ -439,6 +439,24 @@ Func _UpdateResultLabel()
 		$sText &= "s0 = ---  (exakt)" & @CRLF
 	EndIf
 	$sText &= "f  = " & $iF
+
+	; Radial residual statistics
+	If $iF > 0 Then
+		Local $fVMin = 1e30, $fVMax = -1e30, $fVSqSum = 0
+		For $i = 0 To $iN - 1
+			Local $fDX = $g_aPointsX[$i] - $fXM
+			Local $fDY = $g_aPointsY[$i] - $fYM
+			Local $fVRad = Sqrt($fDX ^ 2 + $fDY ^ 2) - $fR
+			If $fVRad < $fVMin Then $fVMin = $fVRad
+			If $fVRad > $fVMax Then $fVMax = $fVRad
+			$fVSqSum += $fVRad ^ 2
+		Next
+		Local $fRMS = Sqrt($fVSqSum / $iN)
+		$sText &= @CRLF & @CRLF
+		$sText &= StringFormat("vmin =%7.1f px", $fVMin) & @CRLF
+		$sText &= StringFormat("vmax =%7.1f px", $fVMax) & @CRLF
+		$sText &= StringFormat("RMS  =%7.1f px", $fRMS)
+	EndIf
 
 	; Outlier count (only when robust is active)
 	If UBound($g_aRobWeights) > 0 Then
