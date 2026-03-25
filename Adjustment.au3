@@ -851,18 +851,19 @@ Func _adj_getResults(ByRef $mSystem)
 	; --- Parameters (flat named maps) ---
 	Local $mX1[], $mSdx[], $mXd[]
 
-	If $mModel.nParams > 0 And MapExists($mResults, "x1") And MapExists($mResults, "sdx") Then
+	If $mModel.nParams > 0 And MapExists($mResults, "x1") Then
 		Local $mIdxParams = $mState.idxParams
 		Local $mVecX1  = $mResults.x1
-		Local $mVecSdx = $mResults.sdx
-		Local $bHasXd = MapExists($mResults, "xd")
+		Local $bHasSdx = MapExists($mResults, "sdx")
+		Local $mVecSdx = $bHasSdx ? $mResults.sdx : Null
+		Local $bHasXd  = MapExists($mResults, "xd")
 		Local $mVecXd  = $bHasXd ? $mResults.xd : Null
 
 		For $sKey In MapKeys($mIdxParams)
 			Local $iIdxP = $mIdxParams[$sKey]
-			$mX1[$sKey]  = __adj_vecGet($mVecX1,  $iIdxP)
-			$mSdx[$sKey] = __adj_vecGet($mVecSdx, $iIdxP)
-			If $bHasXd Then $mXd[$sKey] = __adj_vecGet($mVecXd, $iIdxP)
+			$mX1[$sKey]  = __adj_vecGet($mVecX1, $iIdxP)
+			If $bHasSdx Then $mSdx[$sKey] = __adj_vecGet($mVecSdx, $iIdxP)
+			If $bHasXd  Then $mXd[$sKey]  = __adj_vecGet($mVecXd, $iIdxP)
 		Next
 	EndIf
 	$mRet.x1  = $mX1
