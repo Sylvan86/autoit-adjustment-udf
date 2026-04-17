@@ -2277,18 +2277,24 @@ Func __adj_derivate1D($sFunc, $sParam, $fValue = Default, $mPar = Default, $mObs
 
 	If IsKeyword($fValue) = 1 Then $fValue = $bObs ? $mObs[$sParam] : $mPar[$sParam]
 
-	; scale step sizes to parameter/observation magnitude (avoid catastrophic cancellation for large values)
-	Local $fScale = (Abs($fValue) > 1 ? Abs($fValue) : 1)
+	; scale step sizes to parameter/observation magnitude
+	; Smooth blend h = stepBase · √(x² + stepBase²):
+	;   |x| ≫ stepBase  →  h ≈ stepBase · |x|       (relative scaling, avoids catastrophic cancellation for large x)
+	;   |x| ≪ stepBase  →  h ≈ stepBase²            (floored, avoids over-stepping for tiny x where the old
+	;                                                 max(|x|,1) used h ≈ stepBase, way too coarse for x ≪ 1)
 	If IsKeyword($fH) = 1 Then
-		; optimal step: eps^(1/3) for central differences, eps^(1/2) for forward/backward
+		; optimal stepBase: eps^(1/3) for central differences, eps^(1/2) for forward/backward
+		Local $fStepBase
 		Switch $sMethod
 			Case "Forward", "Backward"
-				$fH = Sqrt($f_LA_DBL_EPS) * $fScale
+				$fStepBase = Sqrt($f_LA_DBL_EPS)
 			Case Else
-				$fH = $f_LA_DBL_STEP * $fScale  ; eps^(1/3)
+				$fStepBase = $f_LA_DBL_STEP
 		EndSwitch
+		$fH = $fStepBase * Sqrt($fValue * $fValue + $fStepBase * $fStepBase)
 	EndIf
-	$fInitialH_Ridder = $fInitialH_Ridder * $fScale
+	; Ridder/Higham initial step keeps the older max(|x|,1) scaling — they refine adaptively from there
+	$fInitialH_Ridder = $fInitialH_Ridder * (Abs($fValue) > 1 ? Abs($fValue) : 1)
 
 	If $bObs Then
 		; Function value at which to derive
