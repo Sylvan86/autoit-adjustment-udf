@@ -1118,8 +1118,14 @@ Func _adj_removeObs(ByRef $mSystem, $vObs)
 	$mSystem.model = $mModel
 
 	; 5. Clear prepared state — next _adj_solve() rebuilds everything
+	; Includes _prepareRunCount and VarianceComponents so __adj_prepareModel runs full setup again
+	; (otherwise it short-circuits and leaves $mSystem.state empty → next solve crashes).
+	; results is reset to an empty map (not removed) because __adj_prepareModel writes into it.
+	Local $mEmpty[]
 	If MapExists($mSystem, "state") Then MapRemove($mSystem, "state")
-	If MapExists($mSystem, "results") Then MapRemove($mSystem, "results")
+	$mSystem.results = $mEmpty
+	If MapExists($mSystem, "_prepareRunCount") Then MapRemove($mSystem, "_prepareRunCount")
+	If MapExists($mSystem, "VarianceComponents") Then MapRemove($mSystem, "VarianceComponents")
 
 	Return $iRemoved
 EndFunc
