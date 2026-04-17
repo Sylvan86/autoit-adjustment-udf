@@ -83,7 +83,9 @@ EndFunc
 ; ===============================================================================================================================
 Func __adj_initWeights(ByRef $mSystem)
 	Local $mModel = $mSystem.model
-	If $mModel._isWeighted Then
+	; VCE needs the .weight field on every observation (computeVtPV/group sums read it),
+	; so initialise also when only _multiVarComp is set (all σᵢ=1 but multiple groups).
+	If $mModel._isWeighted Or $mModel._multiVarComp Then
 		Local $mObservations = $mModel.obs, $sObsName
 
 		If Not MapExists($mSystem, "VarianceComponents") Then
