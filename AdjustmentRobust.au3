@@ -96,6 +96,13 @@ Func __adj_robustIRLS(ByRef $mSystem, ByRef $mState)
 			Return SetError($ADJ_ERR_INPUT, 0, False)
 	EndSwitch
 
+	; auto-fill default tuning parameters if user did not provide any
+	; (otherwise __adj_robustWeight crashes accessing $mParams.c on Null)
+	If IsKeyword($mConfig.robustParams) = 2 Or $mConfig.robustParams = Null Then
+		$mConfig.robustParams = _adj_robustDefaults($mConfig.robust)
+		$mSystem.config = $mConfig
+	EndIf
+
 	; guard: generalized models with full covariance not yet supported
 	If $mState.hasCovariances Then
 		Return SetError($ADJ_ERR_INPUT, 7, False)
