@@ -114,6 +114,7 @@ Global Const $__ADJ_MARQUARDT_ABS_FLOOR  = 1e-30
 ;__adj_isLinear
 ;__adj_normCdf
 ;__adj_normQuantile
+;__adj_popeCdf
 ;__adj_parseDerivativeInput
 ;__adj_tCdf
 ;__adj_parseFormulas

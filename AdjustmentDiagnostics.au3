@@ -206,9 +206,9 @@ Func __adj_computeDiagnostics(ByRef $mSystem)
 		Local $fPBaarda = 2 * __adj_normCdf(-$fW)
 		$mPValue[$sKey] = $fPBaarda
 
-		; p-value from Pope (Student's t-distribution with f degrees of freedom)
-		; same trick: tCdf is symmetric, so 1-tCdf(τ,f) = tCdf(-τ,f), avoiding cancellation for large |τ|
-		Local $fPPope = (Not IsKeyword($fTau)) ? 2 * __adj_tCdf(-$fTau, $iF) : Default
+		; p-value from Pope (τ-distribution, NOT plain Student-t — see __adj_popeCdf header)
+		; cancellation-safe form: 2·F_τ(-|τ|), evaluated via the small-tail incomplete beta.
+		Local $fPPope = (Not IsKeyword($fTau)) ? 2 * __adj_popeCdf(-$fTau, $iF) : Default
 		$mPopePValue[$sKey] = $fPPope
 
 		; blunder estimate ∇̂ = v_i / r_i
@@ -327,6 +327,35 @@ Func __adj_tCdf($t, $f)
 	If $f <= 0 Then Return 0.5
 	Local $p = 0.5 * __adj_betaRI($f / ($f + $t * $t), 0.5 * $f, 0.5)
 	Return ($t >= 0) ? (1 - $p) : $p
+EndFunc
+
+; #INTERNAL_USE_ONLY# ===========================================================================================================
+; Name...........: __adj_popeCdf
+; Description ...: Pope-τ-distribution CDF: P(T ≤ t) for T ~ tau(f)
+; Syntax.........: __adj_popeCdf($t, $f)
+; Parameters ....: $t           - Test statistic value
+;                  $f           - Degrees of freedom (> 1)
+; Return values .: CDF value in [0, 1]
+; Author ........: AspirinJunkie
+; Remarks .......: Pope (1976): τ²·(f-1)/(f-τ²) ~ F(1, f-1) — i.e. the τ-distribution
+;                  is supported on (-√f, √f); outside the interval the CDF is 0 or 1.
+;                  Used for outlier diagnostics with a-posteriori ŝ₀ (numerator and
+;                  denominator of τ_i = w_i/ŝ₀ are NOT independent, so plain Student-t
+;                  with f DoF is wrong — Pope showed the correct distribution has f-1 DoF
+;                  inside this transform).
+;                  Implementation uses the symmetry I_x(a,b) = 1 − I_{1-x}(b,a) of the
+;                  incomplete beta to evaluate the small-tail directly, avoiding
+;                  catastrophic cancellation for large |t|.
+; Related .......: __adj_betaRI, __adj_tCdf, __adj_computeDiagnostics
+; ===============================================================================================================================
+Func __adj_popeCdf($t, $f)
+	If $f <= 1 Then Return ($t >= 0) ? 1 : 0   ; degenerate (no a-posteriori scale info)
+	Local $fT2 = $t * $t
+	If $fT2 >= $f Then Return ($t > 0) ? 1 : 0  ; outside support → tail is exactly 0
+	; one-sided tail: P(|τ| ≥ |t|) = I_{(f-t²)/f}((f-1)/2, 1/2)
+	; (form chosen to keep the small quantity small — no 1−x with cancellation)
+	Local $fHalfTail = 0.5 * __adj_betaRI(($f - $fT2) / $f, 0.5 * ($f - 1), 0.5)
+	Return ($t >= 0) ? (1 - $fHalfTail) : $fHalfTail
 EndFunc
 
 ; #INTERNAL_USE_ONLY# ===========================================================================================================
