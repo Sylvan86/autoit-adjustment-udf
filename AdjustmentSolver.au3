@@ -155,9 +155,11 @@ Func __adj_estimateVCE(ByRef $mSystem, ByRef $mState)
 					$fSigmaSq = $fVtPV / $fRedundancySum
 				EndIf
 
-				; protection against very small estimates
+				; protection against very small / negative variance estimates:
+				; floor at $__ADJ_VCE_MIN_SIGMA2 instead of resetting to 1.0 (which would
+				; throw away the partial information that the group's variance is in fact small)
 				$bClipped = ($fSigmaSq < $__ADJ_VCE_MIN_SIGMA2)
-				If $bClipped Then $fSigmaSq = 1.0
+				If $bClipped Then $fSigmaSq = $__ADJ_VCE_MIN_SIGMA2
 
 				; store per-group results
 				$mGrp = Null
@@ -255,10 +257,11 @@ Func __adj_estimateVCE(ByRef $mSystem, ByRef $mState)
 				$fSigmaSq = $fVtPV / $fRedundancySum
 			EndIf
 
-			; protection against negative/very small variance estimates (Step 6.3)
+			; protection against negative/very small variance estimates (Step 6.3):
+			; floor at $__ADJ_VCE_MIN_SIGMA2 instead of resetting to 1.0
 			$bClipped = ($fSigmaSq < $__ADJ_VCE_MIN_SIGMA2)
 			If $bClipped Then
-				$fSigmaSq = 1.0
+				$fSigmaSq = $__ADJ_VCE_MIN_SIGMA2
 			EndIf
 
 			; store per-group VCE results (overwritten each iteration, final values kept)
