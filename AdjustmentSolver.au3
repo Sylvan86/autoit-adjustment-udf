@@ -544,7 +544,7 @@ Func __adj_solveNonlinear(ByRef $mSystem, ByRef $mState)
 
 		Local $fR2sumPrev = 0  ; for CLS/GLM convergence test (relative residual change)
 		Local $bIsCLS = StringRegExp($mState.modelType, 'CLS$')
-		$bIsGLM = StringRegExp($mState.modelType, 'GLM$')
+		Local $bIsGLM = StringRegExp($mState.modelType, 'GLM$')
 		Local $fMaxDxPrev = 1e308, $iStagnation = 0
 
 		For $i = 1 To $iMaxIterations
@@ -1145,7 +1145,7 @@ Func __adj_applyWhitening(ByRef $mState)
 			; B' = B · L  (TRMM, SIDE=R) — analogous to WGLM: B' = B·diag(σ)
 			; This transforms min ‖ṽ‖₂² into min vᵀPv where ṽ = L⁻¹·v
 			$mB = $mState.Matrix_B
-			$mCholL = $mState.CovCholeskyL
+			Local $mCholL = $mState.CovCholeskyL
 
 			; B' = B · L: TRMM with SIDE=R, UPLO=L, TRANS=N
 			; B has dimension (nFormulas+nRestrictions) × nObs, L is nObs × nObs

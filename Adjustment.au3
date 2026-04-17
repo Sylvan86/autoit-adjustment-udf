@@ -1251,7 +1251,7 @@ Func __adj_parseDerivativeInput($vInput)
 	; parse pipe-delimited string: "X=2*X | Y=2*Y"
 	If IsString($vInput) Then
 		Local $mResult[], $aParts = StringSplit($vInput, "|", 2)
-		Local $sPart, $iEq
+		Local $sPart, $iEq, $sKey
 		For $sPart In $aParts
 			$sPart = StringStripWS($sPart, 3)
 			If $sPart = "" Then ContinueLoop

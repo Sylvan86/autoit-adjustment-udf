@@ -433,7 +433,7 @@ Func __adj_computeCofactors(ByRef $mSystem, ByRef $mState, $mS)
 		; ══════ GLM: Qvv via hat matrix in equation space ══════
 		Local $mBglm = $mState.B_orig
 		Local $mCholeskyM = $mState.CholeskyM
-		$iMeq = $mState.nFormulas
+		Local $iMeq = $mState.nFormulas
 		Local $iNpar = $mState.nParams
 		Local $iScols = $mS.cols  ; nParams (no restrictions) or nFree (with restrictions, S = T = Q2·S)
 
@@ -466,7 +466,7 @@ Func __adj_computeCofactors(ByRef $mSystem, ByRef $mState, $mS)
 		_blas_gemm($mIH, $mT_glm, $mTemp, 1, 0, "N", "N", $iMeq, $iPobs, $iMeq)
 
 		; Qvv_w = Tᵀ · Temp (pobs × pobs)
-		$mQvv = _blas_createMatrix($iPobs, $iPobs)
+		Local $mQvv = _blas_createMatrix($iPobs, $iPobs)
 		_blas_gemm($mT_glm, $mTemp, $mQvv, 1, 0, "T", "N", $iPobs, $iPobs, $iMeq)
 
 		; back-transformation: Qvv = diag(σ)·Qvv_w·diag(σ) or L·Qvv_w·Lᵀ
@@ -479,7 +479,7 @@ Func __adj_computeCofactors(ByRef $mSystem, ByRef $mState, $mS)
 		$mResults.Qvv = $mQvv
 
 		; Qŷ = P⁻¹ - Qvv
-		$mQyhat = _la_duplicate($mQvv)
+		Local $mQyhat = _la_duplicate($mQvv)
 		_la_scale($mQyhat, -1, True)
 		If StringRegExp($sModel, "^G(?!LM)") Then
 			_blas_axpy($mState.Matrix_Sigma, $mQyhat, 1, 0, 0, 1, 1, $iPobs * $iPobs)
@@ -501,7 +501,7 @@ Func __adj_computeCofactors(ByRef $mSystem, ByRef $mState, $mS)
 		_blas_gemm($mA, $mS, $mU, 1, 0, "N", "N", $iM, $iNcols, $mS.rows, $mA.rows)
 
 		; Qŷ_w = U · Uᵀ (m × m, symmetric) — in whitened space for WLS/WLSE
-		$mQyhat = _blas_createMatrix($iM, $iM)
+		Local $mQyhat = _blas_createMatrix($iM, $iM)
 		_blas_syrk($mU, $mQyhat, 1, 0, "U", "N", $iM, $iNcols)
 		__adj_fillLowerFromUpper($mQyhat, $iM)
 
@@ -515,7 +515,7 @@ Func __adj_computeCofactors(ByRef $mSystem, ByRef $mState, $mS)
 		$mResults.Qyhat = $mQyhat
 
 		; Qvv = P⁻¹ - Qŷ
-		$mQvv = _la_duplicate($mQyhat)
+		Local $mQvv = _la_duplicate($mQyhat)
 		_la_scale($mQvv, -1, True)
 		If StringRegExp($sModel, "^G(?!LM)") Then
 			_blas_axpy($mState.Matrix_Sigma, $mQvv, 1, 0, 0, 1, 1, $iM * $iM)
