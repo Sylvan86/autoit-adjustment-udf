@@ -144,6 +144,13 @@ Func __adj_robustIRLS(ByRef $mSystem, ByRef $mState)
 			$mState.modelType = "WGLM"
 	EndSwitch
 
+	; Snapshot the a-priori 1/σᵢ vector BEFORE the IRLS loop starts overwriting
+	; Vector_ObsInvStdDev with √weight (which then folds in _robustWeight from prior
+	; iterations).  __adj_robustScale must read from this snapshot, otherwise the MAD
+	; computation includes the running robust weights — observations get doubly down-
+	; weighted, the scale collapses, and ever more points are flagged as outliers.
+	$mState.Vector_ObsInvStdDev_apriori = _blas_duplicate($mState.Vector_ObsInvStdDev)
+
 	; 4. IRLS iteration loop
 	Local $bConverged = False
 	Local $fScale = 0.0
@@ -320,10 +327,16 @@ Func __adj_robustScale(ByRef $mState, $sMethod, $mParams = Null)
 	; MAD: sigma_hat = median(|v_i / sigma_i|) / 0.6745
 	Local $iN = $mState.nObs
 
+	; Use the a-priori 1/σᵢ snapshot taken by __adj_robustIRLS — the live
+	; Vector_ObsInvStdDev gets overwritten with √weight (which folds in _robustWeight)
+	; on every iteration, so reading it here would doubly down-weight residuals.
+	Local $tInvSd = MapExists($mState, "Vector_ObsInvStdDev_apriori") _
+		? $mState.Vector_ObsInvStdDev_apriori.struct _
+		: $mState.Vector_ObsInvStdDev.struct
+
 	; element-wise |v_i| * (1/sigma_i)
 	Local $mAbsStdResid = _blas_duplicate($mState.r)
 	Local $tR = $mAbsStdResid.struct
-	Local $tInvSd = $mState.Vector_ObsInvStdDev.struct
 	For $i = 1 To $iN
 		DllStructSetData($tR, 1, Abs(DllStructGetData($tR, 1, $i) * DllStructGetData($tInvSd, 1, $i)), $i)
 	Next
