@@ -202,11 +202,13 @@ Func __adj_computeDiagnostics(ByRef $mSystem)
 		$mPopeT[$sKey] = $fTau
 
 		; p-value from Baarda (normal distribution)
-		Local $fPBaarda = 2 * (1 - __adj_normCdf($fW))
+		; use 2·Φ(-|w|) instead of 2·(1-Φ(|w|)) to avoid catastrophic cancellation for large |w|
+		Local $fPBaarda = 2 * __adj_normCdf(-$fW)
 		$mPValue[$sKey] = $fPBaarda
 
 		; p-value from Pope (Student's t-distribution with f degrees of freedom)
-		Local $fPPope = (Not IsKeyword($fTau)) ? 2 * (1 - __adj_tCdf($fTau, $iF)) : Default
+		; same trick: tCdf is symmetric, so 1-tCdf(τ,f) = tCdf(-τ,f), avoiding cancellation for large |τ|
+		Local $fPPope = (Not IsKeyword($fTau)) ? 2 * __adj_tCdf(-$fTau, $iF) : Default
 		$mPopePValue[$sKey] = $fPPope
 
 		; blunder estimate ∇̂ = v_i / r_i
