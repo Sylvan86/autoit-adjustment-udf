@@ -435,14 +435,23 @@ Func __adj_solveNonlinear(ByRef $mSystem, ByRef $mState)
 			; GLM/CLS: |xd|→0 alone is unreliable because relinearisation at l+v
 			; can shift the system; require r2sum stagnation instead (analogous to GN path,
 			; cf. Neitzel/Petrovic 2008).  All other model types: classic |xd|<tol.
+			; Restrictions consistency: nonlinear g(x) need not vanish just because Δx→0
+			; (the linearised step satisfies RA·Δx=-g, but g(x_k+1)≠0 in general).  Require
+			; ‖Vector_WR‖ = ‖-g(x_k)‖ < tol whenever restrictions are present.
+			Local $bRestrOK = ($mState.nRestrictions = 0) _
+				Or (Not MapExists($mState, "Vector_WR")) _
+				Or (_blas_nrm2($mState.Vector_WR) < $fTolerance)
+
 			If $bIsGLM Then
 				If $fR2sumPrev_GLM > 1e-30 _
-					And Abs($mState.r2sum - $fR2sumPrev_GLM) / $fR2sumPrev_GLM < $fTolerance Then ExitLoop
+					And Abs($mState.r2sum - $fR2sumPrev_GLM) / $fR2sumPrev_GLM < $fTolerance _
+					And $bRestrOK Then ExitLoop
 				$fR2sumPrev_GLM = $mState.r2sum
 			Else
 				; Scaled convergence: |Δx| < tol·(1+|x|)
 				; degrades to absolute test |Δx|<tol for |x|→0, to relative |Δx|/|x|<tol for |x|≫1
-				If Abs(_blas_amax($mState.xd)) < $fTolerance * (1 + Abs(_blas_amax($mState.Vector_x0))) Then ExitLoop
+				If Abs(_blas_amax($mState.xd)) < $fTolerance * (1 + Abs(_blas_amax($mState.Vector_x0))) _
+					And $bRestrOK Then ExitLoop
 			EndIf
 
 			; tentatively apply parameter update
@@ -531,14 +540,22 @@ Func __adj_solveNonlinear(ByRef $mSystem, ByRef $mState)
 				If @error Then Return SetError(@error, @extended, False)
 				If StringRight($mState.modelType, 3) <> "CLS" Then __adj_updateParameters($mSystem, $mState)
 				; GLM/CLS: r2sum-based convergence (same reasoning as GN path)
+				; Restrictions consistency: ‖g(x)‖<tol when nonlinear restrictions present
+				Local $bRestrOK_LM = ($mState.nRestrictions = 0) _
+					Or (Not MapExists($mState, "Vector_WR")) _
+					Or (_blas_nrm2($mState.Vector_WR) < $fTolerance)
+
 				If StringRegExp($mState.modelType, '(CLS|GLM)$') Then
 					Local $fDeltaR2LM = Abs($mState.r2sum - $fR2sumPrevLM)
-					If $fR2sumPrevLM > 1e-30 And $fDeltaR2LM / $fR2sumPrevLM < $fTolerance Then ExitLoop
+					If $fR2sumPrevLM > 1e-30 _
+						And $fDeltaR2LM / $fR2sumPrevLM < $fTolerance _
+						And $bRestrOK_LM Then ExitLoop
 					$fR2sumPrevLM = $mState.r2sum
 				Else
 					Local $fMaxDxLM = Abs(_blas_amax($mState.xd))
 					; Scaled convergence: |Δx| < tol·(1+|x|)  (absolute for |x|→0, relative for |x|≫1)
-					If $fMaxDxLM < $fTolerance * (1 + Abs(_blas_amax($mState.Vector_x0))) Then ExitLoop
+					If $fMaxDxLM < $fTolerance * (1 + Abs(_blas_amax($mState.Vector_x0))) _
+						And $bRestrOK_LM Then ExitLoop
 					; adaptive stagnation: corrections no longer decreasing → numerical accuracy floor
 					If $fMaxDxLM > 0.5 * $fMaxDxPrevLM Then
 						$iStagnLM += 1
@@ -576,19 +593,27 @@ Func __adj_solveNonlinear(ByRef $mSystem, ByRef $mState)
 			If Not $mState.isNonlinear And Not $bIsGLM Then ExitLoop
 
 			; convergence test (model-dependent)
+			; Restrictions consistency: ‖g(x)‖<tol when nonlinear restrictions present
+			Local $bRestrOK_GN = ($mState.nRestrictions = 0) _
+				Or (Not MapExists($mState, "Vector_WR")) _
+				Or (_blas_nrm2($mState.Vector_WR) < $fTolerance)
+
 			If $bIsCLS Or $bIsGLM Then
 				; CLS/GLM: convergence via relative change in residual sum vᵀPv
 				; For GLM, xd=0 does NOT mean convergence — the relinearization at l+v
 				; can change the system even when parameter corrections are zero.
 				; See: Neitzel/Petrovic (2008), rigorous vs. approximate GH evaluation.
 				Local $fDeltaR2 = Abs($mState.r2sum - $fR2sumPrev)
-				If $fR2sumPrev > 1e-30 And $fDeltaR2 / $fR2sumPrev < $fTolerance Then ExitLoop
+				If $fR2sumPrev > 1e-30 _
+					And $fDeltaR2 / $fR2sumPrev < $fTolerance _
+					And $bRestrOK_GN Then ExitLoop
 				$fR2sumPrev = $mState.r2sum
 			Else
 				; OLS/WLS/LSE: convergence via parameter correction
 				Local $fMaxDx = Abs(_blas_amax($mState.xd))
 				; Scaled convergence: |Δx| < tol·(1+|x|)  (absolute for |x|→0, relative for |x|≫1)
-				If $fMaxDx < $fTolerance * (1 + Abs(_blas_amax($mState.Vector_x0))) Then ExitLoop
+				If $fMaxDx < $fTolerance * (1 + Abs(_blas_amax($mState.Vector_x0))) _
+					And $bRestrOK_GN Then ExitLoop
 				; adaptive stagnation: if corrections no longer halving → numerical accuracy floor reached
 				If $fMaxDx > 0.5 * $fMaxDxPrev Then
 					$iStagnation += 1
