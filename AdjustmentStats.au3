@@ -250,14 +250,14 @@ Func __adj_computeQxx(ByRef $mSystem, ByRef $mState)
 	_lp_lapmt($mRinvT, $tJPVT_copy, False, $iN, $iN, $iN)
 
 	; 6. Transpose → S = P · R⁻¹
-	$mS = _la_transpose($mRinvT)
+	Local $mS = _la_transpose($mRinvT)
 
 	; Jacobi-Equilibration back-transform: scale S rows by 1/S_eq
 	; so that Qxx = S_scaled · S_scaledᵀ = diag(S⁻¹) · Qxx_eq · diag(S⁻¹)
 	; Only for QR branch — SVD branch uses pre-equilibration A_orig (no scaling needed)
 	If MapExists($mState, "EquilibrationScale") Then
-		$mEqScale = $mState.EquilibrationScale
-		$tEqS = $mEqScale.struct
+		Local $mEqScale = $mState.EquilibrationScale
+		Local $tEqS = $mEqScale.struct
 		; S is n×n (OLS/GLM) or nFree×nFree (LSE) — scale each row i by 1/S_eq_i
 		For $__i = 0 To $iN - 1
 			_blas_scal($mS, 1.0 / DllStructGetData($tEqS, 1, $__i + 1), $__i, $iN, $iN)
@@ -265,11 +265,12 @@ Func __adj_computeQxx(ByRef $mSystem, ByRef $mState)
 	EndIf
 
 	; 7. Qxx = S · Sᵀ (symmetric rank-k update)
+	Local $mQxx
 	If MapExists($mState, "Q2") Then
 		; LSE / GLM+Restrictions back-transformation: Qxx = Q₂ · S · Sᵀ · Q₂ᵀ = T · Tᵀ  where T = Q₂ · S
-		$iNpar = $mState.nParams
-		$mQ2 = $mState.Q2
-		$mT = _blas_createMatrix($iNpar, $iN)
+		Local $iNpar = $mState.nParams
+		Local $mQ2 = $mState.Q2
+		Local $mT = _blas_createMatrix($iNpar, $iN)
 		_blas_gemm($mQ2, $mS, $mT, 1, 0, "N", "N", $iNpar, $iN, $iN)
 
 		$mQxx = _blas_createMatrix($iNpar, $iNpar)
