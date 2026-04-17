@@ -14,7 +14,7 @@ Global Const $ADJ_SOLVER_QR  = "QR"
 Global Const $ADJ_SOLVER_SVD = "SVD"
 
 Global Const $__ADJ_VCE_MIN_SIGMA2   = 1e-6
-Global Const $__ADJ_LM_TAU_DEFAULT   = 1e-3
+Global Const $__ADJ_LM_TAU_DEFAULT   = 1e-2
 Global Const $__ADJ_LM_LAMBDA_MIN    = 1e-7
 Global Const $__ADJ_LM_LAMBDA_MAX    = 1e7
 Global Const $__ADJ_VCE_MAX_ITER     = 15
@@ -653,6 +653,9 @@ EndFunc
 ;                  Set .robust to estimator name and .robustParams for IRLS estimation.
 ;                  Available deriveMethod values: "Central".."Central4", "Forward", "Backward",
 ;                  "Ridder", "Higham".
+;                  .lmTau (default 1e-2) controls the LM initial damping λ₀ = lmTau · max(diag(JᵀPJ)).
+;                  Increase (e.g. 1.0) when starting values are far from the optimum;
+;                  decrease (e.g. 1e-3) only when the linearisation is already very good.
 ; Related .......: _adj_solve, _adj_robustDefaults
 ; Link ..........:
 ; Example .......: No
@@ -750,6 +753,7 @@ Func _adj_solve(ByRef $mSystem, $mConfig = Default)
 	$mState.solver = $mConfig.solver
 	$mState.solverRCOND = (IsKeyword($mConfig.solverRCOND) = 1) ? 1e-5 : $mConfig.solverRCOND
 	$mState.scaling = $mConfig.scaling
+	$mState.fLMTau = MapExists($mConfig, "lmTau") ? $mConfig.lmTau : $__ADJ_LM_TAU_DEFAULT
 
 	; ── Phase 1: Robust estimation (IRLS) ──
 	If $mConfig.robust <> "" Then

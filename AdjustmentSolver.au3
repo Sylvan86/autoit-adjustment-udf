@@ -1879,7 +1879,7 @@ Func __adj_initLMDamping(ByRef $mState)
 			$mState.LM_D = $mD
 
 			; λ₀ = τ · max(diag(N))
-			$fLambda = _blas_amax($mC, 0, $mC.rows + 1, $nP) * 1e-2
+			$fLambda = _blas_amax($mC, 0, $mC.rows + 1, $nP) * $mState.fLMTau
 			$mState.fLMLambda = $fLambda
 
 			; fill augmentation diagonal with √λ · Dᵢ (Marquardt)
@@ -1901,7 +1901,7 @@ Func __adj_initLMDamping(ByRef $mState)
 			$mC = _blas_createMatrix($mA.cols, $mA.cols, $mA.datatype)
 			_blas_syrk($mA, $mC, 1, 0, "U", "T", $mA.cols, $iRows, $mA.rows, $mA.cols)
 
-			$fLambda = _blas_amax($mC, 0, $mC.rows + 1, $mA.cols) * 1e-2
+			$fLambda = _blas_amax($mC, 0, $mC.rows + 1, $mA.cols) * $mState.fLMTau
 			$mState.fLMLambda = $fLambda
 			; Note: LM_D, LM_gradient are set in __adj_dispatchLinearSolver for LSE
 
@@ -1940,7 +1940,7 @@ Func __adj_initLMDamping(ByRef $mState)
 			If $mState.nRestrictions = 0 Then $mState.LM_D = $mD_glm
 
 			; λ₀ = τ · max(diag(N))
-			$fLambda = _blas_amax($mC, 0, $mC.rows + 1, $iNpar_lm) * 1e-2
+			$fLambda = _blas_amax($mC, 0, $mC.rows + 1, $iNpar_lm) * $mState.fLMTau
 			$mState.fLMLambda = $fLambda
 
 			; cache Cholesky factor L and ANORM for reuse in solver (first iteration only)
