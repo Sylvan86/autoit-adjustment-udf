@@ -440,7 +440,9 @@ Func __adj_solveNonlinear(ByRef $mSystem, ByRef $mState)
 					And Abs($mState.r2sum - $fR2sumPrev_GLM) / $fR2sumPrev_GLM < $fTolerance Then ExitLoop
 				$fR2sumPrev_GLM = $mState.r2sum
 			Else
-				If Abs(_blas_amax($mState.xd)) < $fTolerance Then ExitLoop
+				; Scaled convergence: |Δx| < tol·(1+|x|)
+				; degrades to absolute test |Δx|<tol for |x|→0, to relative |Δx|/|x|<tol for |x|≫1
+				If Abs(_blas_amax($mState.xd)) < $fTolerance * (1 + Abs(_blas_amax($mState.Vector_x0))) Then ExitLoop
 			EndIf
 
 			; tentatively apply parameter update
@@ -535,7 +537,8 @@ Func __adj_solveNonlinear(ByRef $mSystem, ByRef $mState)
 					$fR2sumPrevLM = $mState.r2sum
 				Else
 					Local $fMaxDxLM = Abs(_blas_amax($mState.xd))
-					If $fMaxDxLM < $fTolerance Then ExitLoop
+					; Scaled convergence: |Δx| < tol·(1+|x|)  (absolute for |x|→0, relative for |x|≫1)
+					If $fMaxDxLM < $fTolerance * (1 + Abs(_blas_amax($mState.Vector_x0))) Then ExitLoop
 					; adaptive stagnation: corrections no longer decreasing → numerical accuracy floor
 					If $fMaxDxLM > 0.5 * $fMaxDxPrevLM Then
 						$iStagnLM += 1
@@ -584,7 +587,8 @@ Func __adj_solveNonlinear(ByRef $mSystem, ByRef $mState)
 			Else
 				; OLS/WLS/LSE: convergence via parameter correction
 				Local $fMaxDx = Abs(_blas_amax($mState.xd))
-				If $fMaxDx < $fTolerance Then ExitLoop
+				; Scaled convergence: |Δx| < tol·(1+|x|)  (absolute for |x|→0, relative for |x|≫1)
+				If $fMaxDx < $fTolerance * (1 + Abs(_blas_amax($mState.Vector_x0))) Then ExitLoop
 				; adaptive stagnation: if corrections no longer halving → numerical accuracy floor reached
 				If $fMaxDx > 0.5 * $fMaxDxPrev Then
 					$iStagnation += 1
