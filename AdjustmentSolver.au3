@@ -381,6 +381,7 @@ Func __adj_solveNonlinear(ByRef $mSystem, ByRef $mState)
 		Local $mParamsOld, $mStateOld
 		Local $bIsLSE = StringRegExp($mState.modelType, '^W?G?LSE$')
 		Local $bIsGLM = StringRegExp($mState.modelType, '(CLS|GLM)$')
+		Local $fR2sumPrev_GLM = 0     ; previous r2sum for GLM/CLS convergence test
 
 		; GLM deferred gain ratio state: F(x+h) is only available after the NEXT
 		; iteration's __adj_solveIteration (which computes r2sum0 = ‖w̃(x)‖² at the new point).
@@ -431,7 +432,16 @@ Func __adj_solveNonlinear(ByRef $mSystem, ByRef $mState)
 			EndIf
 
 			; solution converged - stop iteration
-			If Abs(_blas_amax($mState.xd)) < $fTolerance Then ExitLoop
+			; GLM/CLS: |xd|→0 alone is unreliable because relinearisation at l+v
+			; can shift the system; require r2sum stagnation instead (analogous to GN path,
+			; cf. Neitzel/Petrovic 2008).  All other model types: classic |xd|<tol.
+			If $bIsGLM Then
+				If $fR2sumPrev_GLM > 1e-30 _
+					And Abs($mState.r2sum - $fR2sumPrev_GLM) / $fR2sumPrev_GLM < $fTolerance Then ExitLoop
+				$fR2sumPrev_GLM = $mState.r2sum
+			Else
+				If Abs(_blas_amax($mState.xd)) < $fTolerance Then ExitLoop
+			EndIf
 
 			; tentatively apply parameter update
 			__adj_updateParameters($mSystem, $mState)
