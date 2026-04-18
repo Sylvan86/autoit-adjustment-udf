@@ -90,6 +90,7 @@ Global Const $__ADJ_MARQUARDT_ABS_FLOOR  = 1e-30
 ;__adj_computeStatistics
 ;__adj_computeVtPV
 ;__adj_createNewSystem
+;__adj_dataSnooping
 ;__adj_derivate1D
 ;__adj_dispatchLinearSolver
 ;__adj_displayColLabel
@@ -116,6 +117,7 @@ Global Const $__ADJ_MARQUARDT_ABS_FLOOR  = 1e-30
 ;__adj_normCdf
 ;__adj_normQuantile
 ;__adj_popeCdf
+;__adj_popeQuantile
 ;__adj_parseDerivativeInput
 ;__adj_tCdf
 ;__adj_parseFormulas
@@ -690,6 +692,14 @@ Func _adj_defaultConfig($sAlgorithm = "LM", $bVCE = False, $iMaxIter = $__ADJ_MA
 	$mCfg.robustMaxIter     = 30
 	$mCfg.robustConvergence = 1e-3
 
+	; iterative data snooping (mutually exclusive with robust)
+	$mCfg.dataSnooping              = False
+	$mCfg.dataSnoopingMethod        = "Pope"   ; "Pope" (a posteriori, default) or "Baarda" (a priori σ₀=1)
+	$mCfg.dataSnoopingAlpha         = 0.001
+	$mCfg.dataSnoopingMaxIter       = 30
+	$mCfg.dataSnoopingMinRedundancy = 0.1      ; Baarda's controllability threshold; below = untestable
+	$mCfg.dataSnoopingDownweight    = 1e15     ; new σᵢ for snooped observations
+
 	; compute flags — what to calculate after solving
 	Local $mCompute[]
 	$mCompute.qxx         = True    ; Qxx + sdx (default: on)
@@ -746,6 +756,19 @@ Func _adj_solve(ByRef $mSystem, $mConfig = Default)
 	; validate solver type
 	If $mConfig.solver <> $ADJ_SOLVER_QR And $mConfig.solver <> $ADJ_SOLVER_SVD Then
 		Return SetError($ADJ_ERR_INPUT, 0, False)
+	EndIf
+
+	; data snooping is mutually exclusive with robust IRLS (different outlier philosophies;
+	; combining them would mask the snooping test statistics).
+	If MapExists($mConfig, "dataSnooping") And $mConfig.dataSnooping And $mConfig.robust <> "" _
+			And Not (MapExists($mConfig, "_inSnooping") And $mConfig._inSnooping) Then
+		Return SetError($ADJ_ERR_INPUT, 6, False)
+	EndIf
+
+	; validate snooping method
+	If MapExists($mConfig, "dataSnooping") And $mConfig.dataSnooping _
+			And $mConfig.dataSnoopingMethod <> "Pope" And $mConfig.dataSnoopingMethod <> "Baarda" Then
+		Return SetError($ADJ_ERR_INPUT, 7, False)
 	EndIf
 
 	__adj_prepareModel($mSystem)
@@ -805,6 +828,150 @@ Func _adj_solve(ByRef $mSystem, $mConfig = Default)
 		$mResults.robustConverged  = $mState.robustConverged
 	EndIf
 
+	$mSystem.results = $mResults
+
+	; ── Phase 3: Iterative data snooping (only on outermost call) ──
+	If MapExists($mConfig, "dataSnooping") And $mConfig.dataSnooping _
+			And Not (MapExists($mConfig, "_inSnooping") And $mConfig._inSnooping) Then
+		__adj_dataSnooping($mSystem, $mConfig)
+		$mSystem.config = $mConfig   ; restore user config (inner calls overwrote with _inSnooping flag)
+	EndIf
+EndFunc
+
+; #INTERNAL_USE_ONLY# ===========================================================================================================
+; Name...........: __adj_dataSnooping
+; Description ...: Iterative outlier detection via Baarda or Pope test. Each iteration:
+;                  computes diagnostics, picks the observation with the largest |statistic|
+;                  among those with r_i ≥ minRedundancy, compares against a Sidak-corrected
+;                  critical value, soft-downweights the worst (σᵢ → downweight) and re-solves.
+;                  Stops when max statistic falls below the critical value, when no testable
+;                  observation remains, or when the iteration cap is reached.
+; Syntax.........: __adj_dataSnooping(ByRef $mSystem, $mConfig)
+; Parameters ....: $mSystem     - [ByRef] The adjustment system (must already be solved)
+;                  $mConfig     - User's solver config (snooping fields read here)
+; Return values .: None — populates $mSystem.results.snoopingReport (Array of Maps with keys
+;                  .key, .iteration, .method, .statistic, .critical, .redundancy,
+;                  .stdDevOriginal), .snoopingConverged (Bool), .snoopingIterations (Int).
+; Author ........: AspirinJunkie
+; Remarks .......: Soft-downweighting only — no observation is physically removed.
+;                  Original σᵢ is preserved in obs._stdDevOriginal so the user can restore.
+; ===============================================================================================================================
+Func __adj_dataSnooping(ByRef $mSystem, $mConfig)
+	Local $sMethod    = $mConfig.dataSnoopingMethod
+	Local $fAlpha     = $mConfig.dataSnoopingAlpha
+	Local $iMaxIter   = $mConfig.dataSnoopingMaxIter
+	Local $fMinR      = $mConfig.dataSnoopingMinRedundancy
+	Local $fDownSigma = $mConfig.dataSnoopingDownweight
+
+	; inner-call config (suppresses recursive snooping)
+	Local $mInner = $mConfig
+	$mInner._inSnooping = True
+
+	Local $aReport[0]
+	Local $bConverged = False
+	Local $iIter = 0
+
+	While $iIter < $iMaxIter
+		$iIter += 1
+
+		; ensure diagnostics are present (first iteration may need them; subsequent always)
+		__adj_ensureComputed($mSystem, "diagnostics")
+		If @error Then ExitLoop
+
+		Local $mResults = $mSystem.results
+		Local $iF       = $mResults.f
+		If $iF <= 0 Then ExitLoop
+
+		; pick statistic map for current method (key-indexed, populated by __adj_computeDiagnostics)
+		Local $mStatMap = ($sMethod = "Pope") ? $mResults.popeT : $mResults.baardaW
+		Local $mObsAll  = ($mSystem.model).obs
+		Local $mIdxObs  = ($mSystem.state).idxObs   ; key → solver-row index
+		Local $mVecRed  = $mResults.redundancyDiag  ; BLAS vector, indexed by idxObs
+
+		; effective n = currently active (not yet snooped) observations
+		Local $iNeff = 0
+		For $sK In MapKeys($mObsAll)
+			If Not (MapExists($mObsAll[$sK], "_snooped") And ($mObsAll[$sK])._snooped) Then $iNeff += 1
+		Next
+		If $iNeff < 1 Then ExitLoop
+
+		; Sidak-corrected critical value (two-sided test)
+		Local $fAlphaEff = 1 - (1 - $fAlpha) ^ (1 / $iNeff)
+		Local $fP        = 1 - $fAlphaEff / 2
+		Local $fCrit
+		If $sMethod = "Pope" Then
+			$fCrit = ($iF > 1) ? __adj_popeQuantile($fP, $iF) : __adj_normQuantile($fP)
+		Else
+			$fCrit = __adj_normQuantile($fP)
+		EndIf
+
+		; find candidate with maximal |statistic| among controllable observations (r_i ≥ min)
+		Local $sBestKey = "", $fBestStat = -1, $fBestR = 0, $fBestSigma = 0
+		For $sK In MapKeys($mStatMap)
+			Local $mObsK = $mObsAll[$sK]
+			If MapExists($mObsK, "_snooped") And $mObsK._snooped Then ContinueLoop
+			Local $vStat = $mStatMap[$sK]
+			If IsKeyword($vStat) Then ContinueLoop
+			Local $vR = __adj_vecGet($mVecRed, $mIdxObs[$sK])
+			If $vR < $fMinR Then ContinueLoop
+			Local $fAbs = Abs($vStat)
+			If $fAbs > $fBestStat Then
+				$fBestStat  = $fAbs
+				$sBestKey   = $sK
+				$fBestR     = $vR
+				$fBestSigma = MapExists($mObsK, "_stdDevOriginal") ? $mObsK._stdDevOriginal : $mObsK.stdDev
+			EndIf
+		Next
+
+		If $sBestKey = "" Then ExitLoop                ; no testable observation
+		If $fBestStat < $fCrit Then
+			$bConverged = True
+			ExitLoop
+		EndIf
+
+		; record snooping decision
+		Local $mEntry[]
+		$mEntry.key            = $sBestKey
+		$mEntry.iteration      = $iIter
+		$mEntry.method         = $sMethod
+		$mEntry.statistic      = $fBestStat
+		$mEntry.critical       = $fCrit
+		$mEntry.redundancy     = $fBestR
+		$mEntry.stdDevOriginal = $fBestSigma
+		ReDim $aReport[UBound($aReport) + 1]
+		$aReport[UBound($aReport) - 1] = $mEntry
+
+		; downweight the offending observation (soft removal — preserves model structure)
+		Local $mModel = $mSystem.model
+		Local $mObs   = $mModel.obs
+		Local $mObsB  = $mObs[$sBestKey]
+		If Not MapExists($mObsB, "_stdDevOriginal") Then $mObsB._stdDevOriginal = $mObsB.stdDev
+		$mObsB.stdDev   = $fDownSigma
+		$mObsB._snooped = True
+		If MapExists($mObsB, "weight")           Then MapRemove($mObsB, "weight")
+		If MapExists($mObsB, "_weightOriginal") Then MapRemove($mObsB, "_weightOriginal")
+		$mObs[$sBestKey] = $mObsB
+		$mModel.obs      = $mObs
+		$mSystem.model   = $mModel
+
+		; reset prepared state to force a full rebuild of weights, Σₗₗ, Cholesky, and matrices
+		Local $mEmpty[]
+		If MapExists($mSystem, "state") Then MapRemove($mSystem, "state")
+		$mSystem.results = $mEmpty
+		If MapExists($mSystem, "_prepareRunCount") Then MapRemove($mSystem, "_prepareRunCount")
+		If MapExists($mSystem, "VarianceComponents") Then MapRemove($mSystem, "VarianceComponents")
+
+		; re-solve (recursion guarded by $mInner._inSnooping)
+		_adj_solve($mSystem, $mInner)
+		If @error Then ExitLoop
+	WEnd
+
+	; attach report to results of the *last* solve
+	Local $mResults = $mSystem.results
+	$mResults.snoopingReport     = $aReport
+	$mResults.snoopingConverged  = $bConverged
+	$mResults.snoopingIterations = $iIter
+	$mResults.snoopingMethod     = $sMethod
 	$mSystem.results = $mResults
 EndFunc
 
@@ -957,6 +1124,14 @@ Func _adj_getResults(ByRef $mSystem)
 		$mRet.robustIterations = $mResults.robustIterations
 		$mRet.robustScale      = $mResults.robustScale
 		$mRet.robustConverged  = $mResults.robustConverged
+	EndIf
+
+	; --- Iterative data snooping ---
+	If MapExists($mResults, "snoopingReport") Then
+		$mRet.snoopingReport     = $mResults.snoopingReport
+		$mRet.snoopingConverged  = $mResults.snoopingConverged
+		$mRet.snoopingIterations = $mResults.snoopingIterations
+		$mRet.snoopingMethod     = $mResults.snoopingMethod
 	EndIf
 
 	Return $mRet

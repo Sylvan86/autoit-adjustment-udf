@@ -368,6 +368,36 @@ Func __adj_popeCdf($t, $f)
 EndFunc
 
 ; #INTERNAL_USE_ONLY# ===========================================================================================================
+; Name...........: __adj_popeQuantile
+; Description ...: Inverse Pope-τ-distribution CDF: returns τ such that P(T ≤ τ) = p.
+;                  Solved by bisection on __adj_popeCdf since the support (-√f, √f) is
+;                  bounded and the CDF is strictly monotonic on it.
+; Syntax.........: __adj_popeQuantile($p, $f)
+; Parameters ....: $p           - Probability in (0, 1)
+;                  $f           - Degrees of freedom (> 1)
+; Return values .: Pope-τ quantile (Float)
+; Author ........: AspirinJunkie
+; Related .......: __adj_popeCdf
+; ===============================================================================================================================
+Func __adj_popeQuantile($p, $f)
+	If $f <= 1 Then Return SetError(1, 0, 0)
+	If $p <= 0 Then Return -Sqrt($f)
+	If $p >= 1 Then Return  Sqrt($f)
+	; bisection on monotonic CDF; support is (-√f, √f)
+	Local $fLo = -Sqrt($f) + 1e-12, $fHi = Sqrt($f) - 1e-12
+	For $i = 1 To 80
+		Local $fMid = 0.5 * ($fLo + $fHi)
+		If __adj_popeCdf($fMid, $f) < $p Then
+			$fLo = $fMid
+		Else
+			$fHi = $fMid
+		EndIf
+		If ($fHi - $fLo) < 1e-12 Then ExitLoop
+	Next
+	Return 0.5 * ($fLo + $fHi)
+EndFunc
+
+; #INTERNAL_USE_ONLY# ===========================================================================================================
 ; Name...........: __adj_betaRI
 ; Description ...: Regularized incomplete beta function I_x(a,b) = B(x;a,b) / B(a,b)
 ; Syntax.........: __adj_betaRI($x, $a, $b)
