@@ -605,6 +605,40 @@ Func __adj_computeRedundancy(ByRef $mSystem, ByRef $mState)
 	$mSystem.results = $mResults
 EndFunc
 
+; #INTERNAL_USE_ONLY# ===========================================================================================================
+; Name...........: __adj_computeCorrelation
+; Description ...: Computes the parameter correlation matrix Corr = D⁻¹ · Qxx · D⁻¹
+;                  with D = diag(√(diag(Qxx))). Diagonals = 1, off-diagonals
+;                  ∈ [-1, 1] reveal redundant / overly-coupled parameters.
+;                  Implemented via two TRSM calls treating D as a (diagonal-only)
+;                  triangular matrix — no element loop.
+; Syntax.........: __adj_computeCorrelation($mSystem)
+; Parameters ....: $mSystem     - [ByRef] The adjustment system (Qxx must exist)
+; Return values .: None (stores correlation in $mSystem.results)
+; Author ........: AspirinJunkie
+; ===============================================================================================================================
+Func __adj_computeCorrelation(ByRef $mSystem)
+	Local $mResults = $mSystem.results
+	If Not MapExists($mResults, "Qxx") Then Return
+	Local $mQxx = $mResults.Qxx
+	Local $iN = $mQxx.rows
+	If $iN < 1 Then Return
+
+	; D = diag(√(diag(Qxx))); floor at 0 for numerical safety, then sqrt
+	Local $mDiag = _la_getDiag($mQxx)
+	__adj_floorAtZero($mDiag)
+	_la_sqrtElements($mDiag, True)
+	Local $mD = _la_VectorToDiag($mDiag)
+
+	; Corr = D⁻¹ · Qxx · D⁻¹  (D treated as lower-triangular non-unit, off-diag = 0)
+	Local $mCorr = _la_duplicate($mQxx)
+	_blas_trsm($mD, $mCorr.ptr, 1.0, "L", "L", "N", "N", $iN, $iN, $iN, $iN)
+	_blas_trsm($mD, $mCorr.ptr, 1.0, "R", "L", "N", "N", $iN, $iN, $iN, $iN)
+
+	$mResults.correlation = $mCorr
+	$mSystem.results = $mResults
+EndFunc
+
 #EndRegion ; Cofactor matrices
 
 #Region Matrix helpers

@@ -76,6 +76,15 @@ Func __adj_ensureComputed(ByRef $mSystem, $sWhat)
 			If @error Then Return SetError(@error, @extended, False)
 			Return True
 
+		Case "correlation"
+			If MapExists($mResults, "correlation") Then Return True
+			; dependency: qxx
+			__adj_ensureComputed($mSystem, "qxx")
+			If @error Then Return SetError(@error, @extended, False)
+			__adj_computeCorrelation($mSystem)
+			If @error Then Return SetError(@error, @extended, False)
+			Return True
+
 		Case "globalTest"
 			If MapExists($mResults, "globalTestPassed") Then Return True
 			__adj_computeGlobalTest($mSystem)

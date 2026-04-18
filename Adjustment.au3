@@ -77,6 +77,7 @@ Global Const $__ADJ_MARQUARDT_ABS_FLOOR  = 1e-30
 ;__adj_classifyModel
 ;__adj_computeCofactors
 ;__adj_computeContradiction
+;__adj_computeCorrelation
 ;__adj_computeDiagnostics
 ;__adj_computeDOF
 ;__adj_computeGlobalTest
@@ -916,9 +917,10 @@ Func _adj_getResults(ByRef $mSystem)
 	EndIf
 
 	; --- Raw cofactor matrices ---
-	$mRet.Qxx   = MapExists($mResults, "Qxx")   ? $mResults.Qxx   : Null
-	$mRet.Qvv   = MapExists($mResults, "Qvv")   ? $mResults.Qvv   : Null
-	$mRet.Qyhat = MapExists($mResults, "Qyhat") ? $mResults.Qyhat : Null
+	$mRet.Qxx         = MapExists($mResults, "Qxx")         ? $mResults.Qxx         : Null
+	$mRet.Qvv         = MapExists($mResults, "Qvv")         ? $mResults.Qvv         : Null
+	$mRet.Qyhat       = MapExists($mResults, "Qyhat")       ? $mResults.Qyhat       : Null
+	$mRet.correlation = MapExists($mResults, "correlation") ? $mResults.correlation : Null
 
 	; --- Global test (from compute-on-demand, if computed) ---
 	If MapExists($mResults, "globalTestPassed") Then
