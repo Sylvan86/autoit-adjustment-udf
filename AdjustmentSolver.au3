@@ -292,25 +292,41 @@ Func __adj_estimateVCE(ByRef $mSystem, ByRef $mState)
 		; σᵢ,eff = 1/√pᵢ, 1/σᵢ,eff = √pᵢ
 		__adj_updateWhiteningVectors($mSystem, $mState)
 
-		If $bConverged Then
-			; recompute vtpv and s₀ with final weights so results are consistent
-			Local $fVtPvFinal = 0
-			For $sGroup In MapKeys($mGroupIndices)
-				Local $aIdx2 = $mGroupIndices[$sGroup]
-				For $j = 0 To UBound($aIdx2) - 1
-					Local $iIdx2 = $aIdx2[$j]
-					Local $fVi2 = __adj_vecGet($mVecV, $iIdx2)
-					Local $fPi2 = ($mObservations[$aIdxToName[$iIdx2]]).weight
-					$fVtPvFinal += $fVi2^2 * $fPi2
-				Next
-			Next
-			$mResults["vtpv"] = $fVtPvFinal
-			$mResults["s0"] = Sqrt($fVtPvFinal / $mResults.f)
-			$mSystem.results = $mResults
-			ExitLoop
-		EndIf
+		If $bConverged Then ExitLoop
 
 	Next
+
+	; After VCE convergence, re-solve + re-compute statistics with the final
+	; weights so Qxx / sdx / Qvv / redundancy reflect the corrected stochastic
+	; model (not the weights from the penultimate iteration). Without this
+	; refresh, s0 drops to ~1 but Qxx stays at its pre-VCE value, and the
+	; reported sdx is inconsistent with the variance components.
+	If $bDoVCE And $bConverged Then
+		; Invalidate cached stats so __adj_ensureComputed recomputes them against
+		; the updated weights (the cache check is `If MapExists(...) Then Return True`).
+		Local $mResInv = $mSystem.results
+		Local $aKeys = StringSplit("Qxx|sdx|Qvv|Qyhat|redundancyDiag|correlation|" _
+		  & "baardaW|popeT|pValue|blunder|mdb|testDecision|" _
+		  & "globalTestPassed|globalTestT|globalTestLower|globalTestUpper|globalTestAlpha", "|", 2)
+		For $sK In $aKeys
+			If MapExists($mResInv, $sK) Then MapRemove($mResInv, $sK)
+		Next
+		$mSystem.results = $mResInv
+
+		If MapExists($mState, "nIterations")      Then MapRemove($mState, "nIterations")
+		If MapExists($mState, "r_accumulated")     Then MapRemove($mState, "r_accumulated")
+		If MapExists($mState, "LM_D")              Then MapRemove($mState, "LM_D")
+		If MapExists($mState, "LM_gradient")       Then MapRemove($mState, "LM_gradient")
+		If MapExists($mState, "LM_step")           Then MapRemove($mState, "LM_step")
+		If MapExists($mState, "EquilibrationScale") Then MapRemove($mState, "EquilibrationScale")
+		; State cache (S-matrix carried between qxx → cofactors → redundancy)
+		If MapExists($mState, "S") Then MapRemove($mState, "S")
+
+		__adj_solveNonlinear($mSystem, $mState)
+		If @error Then Return SetError(@error, @extended, False)
+		__adj_computeResiduals($mSystem, $mState)
+		__adj_computeStatistics($mSystem, $mState)
+	EndIf
 
 	; --- Store VCE results in $mSystem.results ---
 	If $bDoVCE Then
