@@ -691,7 +691,7 @@ Func _adj_defaultConfig($sAlgorithm = "LM", $bVCE = False, $iMaxIter = $__ADJ_MA
 	$mCfg.robust            = ""
 	$mCfg.robustParams      = Null
 	$mCfg.robustMaxIter     = 30
-	$mCfg.robustConvergence = 1e-3
+	$mCfg.robustConvergence = 1e-2
 	; inner maxIterations for the GN loop during IRLS re-solves.  Since x* barely
 	; moves between IRLS iterations (only weights change), a warm-started GN
 	; normally converges in 1–2 inner steps; allowing the full maxIterations (100)
