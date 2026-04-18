@@ -692,6 +692,12 @@ Func _adj_defaultConfig($sAlgorithm = "LM", $bVCE = False, $iMaxIter = $__ADJ_MA
 	$mCfg.robustParams      = Null
 	$mCfg.robustMaxIter     = 30
 	$mCfg.robustConvergence = 1e-3
+	; inner maxIterations for the GN loop during IRLS re-solves.  Since x* barely
+	; moves between IRLS iterations (only weights change), a warm-started GN
+	; normally converges in 1–2 inner steps; allowing the full maxIterations (100)
+	; lets pathological cases (Biweight with re-descending weights) spin for the
+	; full cap before stopping. 10 is a safe upper bound.
+	$mCfg.robustInnerMaxIter = 10
 	; cascade-init (MM-estimator pattern): run Huber first, then redescending. Default ON
 	; for non-convex estimators (Biweight, Hampel, BIBER) since Huber's convex global minimum
 	; provides a much better starting point than the non-robust solve alone.

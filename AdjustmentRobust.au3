@@ -228,6 +228,16 @@ Func __adj_runIRLSPhase(ByRef $mSystem, ByRef $mState, $aRedundancy, $iMaxIter)
 		If MapExists($mConfig.robustParams, "scale") Then $sScaleMethod = $mConfig.robustParams.scale
 	EndIf
 
+	; Cap the inner GN/LM iterations during IRLS re-solves: after the initial
+	; non-robust solve x* is already very close to the fixed point, so 1–2
+	; inner iterations suffice per outer IRLS step. Without this cap, a
+	; redescending-weighted system can keep the inner loop spinning up to the
+	; full maxIterations (100) before it stops.
+	Local $iOuterMaxIter = $mConfig.maxIterations
+	Local $iInnerCap = MapExists($mConfig, "robustInnerMaxIter") ? $mConfig.robustInnerMaxIter : 10
+	$mConfig.maxIterations = $iInnerCap
+	$mSystem.config = $mConfig
+
 	For $iIRLS = 1 To $iMaxIter
 		$fScale = __adj_robustScale($mState, $sScaleMethod, $mConfig.robustParams)
 
@@ -261,9 +271,19 @@ Func __adj_runIRLSPhase(ByRef $mSystem, ByRef $mState, $aRedundancy, $iMaxIter)
 		EndIf
 
 		__adj_solveNonlinear($mSystem, $mState)
-		If @error Then Return SetError(@error, @extended, Null)
+		If @error Then
+			; restore config before bailing out
+			$mConfig.maxIterations = $iOuterMaxIter
+			$mSystem.config = $mConfig
+			Return SetError(@error, @extended, Null)
+		EndIf
 		__adj_computeResiduals($mSystem, $mState)
 	Next
+
+	; restore original maxIterations so downstream phases (VCE, statistics)
+	; don't inherit the IRLS inner cap
+	$mConfig.maxIterations = $iOuterMaxIter
+	$mSystem.config = $mConfig
 
 	Local $mRet[]
 	$mRet.iterations = $iIterations
