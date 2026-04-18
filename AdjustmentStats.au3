@@ -85,6 +85,7 @@ Func __adj_computeStatistics(ByRef $mSystem, ByRef $mState)
 	If $mCompute.redundancy  Then __adj_ensureComputed($mSystem, "redundancy")
 	If $mCompute.globalTest  Then __adj_ensureComputed($mSystem, "globalTest")
 	If $mCompute.diagnostics Then __adj_ensureComputed($mSystem, "diagnostics")
+	If MapExists($mCompute, "reliability") And $mCompute.reliability Then __adj_ensureComputed($mSystem, "reliability")
 EndFunc
 
 #EndRegion ; Statistics orchestration

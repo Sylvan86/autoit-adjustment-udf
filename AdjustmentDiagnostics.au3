@@ -99,6 +99,15 @@ Func __adj_ensureComputed(ByRef $mSystem, $sWhat)
 			If @error Then Return SetError(@error, @extended, False)
 			Return True
 
+		Case "reliability"
+			If MapExists($mResults, "outerReliability") Then Return True
+			; dependency: diagnostics (provides MDB and λ₀ context)
+			__adj_ensureComputed($mSystem, "diagnostics")
+			If @error Then Return SetError(@error, @extended, False)
+			__adj_computeReliability($mSystem)
+			If @error Then Return SetError(@error, @extended, False)
+			Return True
+
 		Case Else
 			Return SetError($ADJ_ERR_INPUT, 0, False)
 	EndSwitch
@@ -246,6 +255,105 @@ Func __adj_computeDiagnostics(ByRef $mSystem)
 	$mResults.testDecision   = $mTestDecision
 	$mResults.testBasis      = $sTestBasis
 	$mResults.baardaWarning  = $bBaardaWarning
+	$mSystem.results = $mResults
+EndFunc
+
+; #INTERNAL_USE_ONLY# ===========================================================================================================
+; Name...........: __adj_computeReliability
+; Description ...: Outer reliability — quantifies how strongly an undetected blunder
+;                  of MDB magnitude in a single observation distorts the parameters.
+;                  Two outputs per observation:
+;                    1. Scalar δ₀ᵢ = √((1-rᵢ)·λ₀/rᵢ) — global outer reliability measure
+;                       (Baarda 1968). Small for well-controlled obs, blows up at
+;                       leverage points (rᵢ → 0).
+;                    2. Effect vector ∇xᵢ = Qxx · AᵀP · eᵢ · MDB_i — change in each
+;                       parameter when an undetected blunder of MDB size is present
+;                       in observation i. Computed as a single (Qxx · Ãᵀ) GEMM
+;                       followed by per-column scaling by √(λ₀/rᵢ).
+;                  Plus a per-obs warning flag for rᵢ < 0.1 (Baarda's controllability
+;                  threshold — below this the test has too little power to be useful).
+; Syntax.........: __adj_computeReliability($mSystem)
+; Parameters ....: $mSystem     - [ByRef] The adjustment system (MDB and Qxx required)
+; Return values .: None — populates $mSystem.results.outerReliability (Map),
+;                  .outerEffect (nested Map obs → param → scalar), and
+;                  .reliabilityWarning (Map obs → Bool).
+; Author ........: AspirinJunkie
+; Remarks .......: Effect-vector computation only supports diagonal weights (OLS/WLS);
+;                  for full-covariance models the scalar is still computed but the
+;                  effect vector is set to Default with reliabilityWarning = True.
+; ===============================================================================================================================
+Func __adj_computeReliability(ByRef $mSystem)
+	Local $mResults = $mSystem.results
+	Local $mState   = $mSystem.state
+	Local $mConfig  = $mSystem.config
+
+	If Not MapExists($mResults, "redundancyDiag") Then Return SetError($ADJ_ERR_INPUT, 0, False)
+	If Not MapExists($mResults, "Qxx") Then Return SetError($ADJ_ERR_INPUT, 0, False)
+
+	Local $fAlpha   = $mConfig.diagnostics.alpha
+	Local $fBeta    = $mConfig.diagnostics.beta
+	Local $fLambda0 = (__adj_normQuantile(1 - $fAlpha / 2) + __adj_normQuantile(1 - $fBeta)) ^ 2
+
+	Local $mVecRed   = $mResults.redundancyDiag
+	Local $mIdxObs   = $mState.idxObs
+	Local $mIdxParam = $mState.idxParams
+
+	; --- Scalars: δ₀ᵢ and warning flags ---
+	Local $mDelta[], $mWarn[]
+	For $sKey In MapKeys($mIdxObs)
+		Local $fRi = __adj_vecGet($mVecRed, $mIdxObs[$sKey])
+		If $fRi < 1e-12 Then
+			$mDelta[$sKey] = Default
+			$mWarn[$sKey]  = True
+		Else
+			$mDelta[$sKey] = Sqrt((1 - $fRi) * $fLambda0 / $fRi)
+			$mWarn[$sKey]  = ($fRi < 0.1)
+		EndIf
+	Next
+	$mResults.outerReliability   = $mDelta
+	$mResults.reliabilityWarning = $mWarn
+
+	; --- Effect matrix (only diagonal weights / OLS/WLS) ---
+	Local $mEffect[]
+	If $mState.hasCovariances Or Not MapExists($mState, "A_orig") Then
+		; full covariance or no original Jacobian retained → effect not computable
+		For $sKey In MapKeys($mIdxObs)
+			$mEffect[$sKey] = Default
+		Next
+		$mResults.outerEffect = $mEffect
+		$mSystem.results = $mResults
+		Return
+	EndIf
+
+	Local $mAtilde = $mState.A_orig          ; whitened Jacobian (n_obs × n_params)
+	Local $mQxx    = $mResults.Qxx
+	Local $iNp     = $mState.nParams
+	Local $iNo     = $mState.nObs
+
+	; G = Qxx · Ãᵀ  (n_params × n_obs) — single GEMM
+	Local $mG = _blas_createMatrix($iNp, $iNo)
+	_blas_gemm($mQxx, $mAtilde, $mG, 1.0, 0.0, "N", "T", $iNp, $iNo, $iNp, $iNp)
+
+	; column-scale: column i *= √(λ₀ / rᵢ)  → effect for obs i
+	; (per-column BLAS scal — n_obs dispatches, each scaling n_params doubles)
+	For $sKey In MapKeys($mIdxObs)
+		Local $iIdx = $mIdxObs[$sKey]
+		Local $fRi  = __adj_vecGet($mVecRed, $iIdx)
+		Local $fSc  = ($fRi > 1e-12) ? Sqrt($fLambda0 / $fRi) : 0
+		_blas_scal($mG, $fSc, $iIdx * $iNp, 1, $iNp)
+	Next
+
+	; materialise into nested named map (one-time post-processing — opt-in only)
+	For $sKey In MapKeys($mIdxObs)
+		Local $iIdxO = $mIdxObs[$sKey]
+		Local $mPerObs[]
+		For $sParam In MapKeys($mIdxParam)
+			Local $iIdxP = $mIdxParam[$sParam]
+			$mPerObs[$sParam] = DllStructGetData($mG.struct, 1, $iIdxO * $iNp + $iIdxP + 1)
+		Next
+		$mEffect[$sKey] = $mPerObs
+	Next
+	$mResults.outerEffect = $mEffect
 	$mSystem.results = $mResults
 EndFunc
 

@@ -86,6 +86,7 @@ Global Const $__ADJ_MARQUARDT_ABS_FLOOR  = 1e-30
 ;__adj_computeQxxFromSVD
 ;__adj_computeRedundancy
 ;__adj_computeRedundancyDiag
+;__adj_computeReliability
 ;__adj_computeResiduals
 ;__adj_computeStatistics
 ;__adj_computeVtPV
@@ -723,6 +724,7 @@ Func _adj_defaultConfig($sAlgorithm = "LM", $bVCE = False, $iMaxIter = $__ADJ_MA
 	$mCompute.redundancy  = False   ; diag(R)
 	$mCompute.globalTest  = False   ; χ²-Test
 	$mCompute.diagnostics = False   ; Baarda |w|, Pope Tτ, p-value, ∇̂, MDB
+	$mCompute.reliability = False   ; outer reliability δ₀ᵢ + parameter effect ∇xᵢ per obs (opt-in)
 	$mCfg.compute = $mCompute
 
 	; diagnostics parameters (only used when compute.diagnostics=True or display requests it)
@@ -1132,6 +1134,13 @@ Func _adj_getResults(ByRef $mSystem)
 		$mRet.testDecision   = $mResults.testDecision
 		$mRet.testBasis      = $mResults.testBasis
 		$mRet.baardaWarning  = $mResults.baardaWarning
+	EndIf
+
+	; --- Outer reliability (only when compute.reliability is set or ensureComputed called) ---
+	If MapExists($mResults, "outerReliability") Then
+		$mRet.outerReliability    = $mResults.outerReliability
+		$mRet.outerEffect         = $mResults.outerEffect
+		$mRet.reliabilityWarning  = $mResults.reliabilityWarning
 	EndIf
 
 	; --- VCE results (only present when VCE was active) ---
