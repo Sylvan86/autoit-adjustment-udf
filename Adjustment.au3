@@ -800,13 +800,20 @@ Func _adj_solve(ByRef $mSystem, $mConfig = Default)
 			$mSystem.state = $mState
 			Return SetError($__iErrR, $__iExtR, False)
 		EndIf
-		; reset iteration state for clean VKS/final phase
-		If MapExists($mState, "nIterations")      Then MapRemove($mState, "nIterations")
-		If MapExists($mState, "r_accumulated")     Then MapRemove($mState, "r_accumulated")
-		If MapExists($mState, "LM_D")              Then MapRemove($mState, "LM_D")
-		If MapExists($mState, "LM_gradient")       Then MapRemove($mState, "LM_gradient")
-		If MapExists($mState, "LM_step")           Then MapRemove($mState, "LM_step")
-		If MapExists($mState, "EquilibrationScale") Then MapRemove($mState, "EquilibrationScale")
+		; Reset iteration state only when a full VCE follows (each VCE outer
+		; iteration needs to re-converge from a clean slate). For single-pass
+		; VCE after robust (vce=False), the final __adj_estimateVCE call just
+		; does one solveNonlinear + stats — keeping nIterations (and, for GN,
+		; the whole LM-free state) lets that solve warm-start from the IRLS
+		; fixed point in 1–2 inner iterations instead of restarting from scratch.
+		If $mConfig.vce Then
+			If MapExists($mState, "nIterations")      Then MapRemove($mState, "nIterations")
+			If MapExists($mState, "r_accumulated")     Then MapRemove($mState, "r_accumulated")
+			If MapExists($mState, "LM_D")              Then MapRemove($mState, "LM_D")
+			If MapExists($mState, "LM_gradient")       Then MapRemove($mState, "LM_gradient")
+			If MapExists($mState, "LM_step")           Then MapRemove($mState, "LM_step")
+			If MapExists($mState, "EquilibrationScale") Then MapRemove($mState, "EquilibrationScale")
+		EndIf
 	EndIf
 
 	; ── Phase 2: VKS or single-pass ──
