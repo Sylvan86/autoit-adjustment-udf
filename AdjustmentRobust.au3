@@ -244,13 +244,21 @@ Func __adj_runIRLSPhase(ByRef $mSystem, ByRef $mState, $aRedundancy, $iMaxIter)
 
 		__adj_updateWhiteningVectors($mSystem, $mState)
 
-		; reset iteration state for fresh GN/LM convergence (mirrors VCE reset)
-		If MapExists($mState, "nIterations")      Then MapRemove($mState, "nIterations")
-		If MapExists($mState, "r_accumulated")     Then MapRemove($mState, "r_accumulated")
-		If MapExists($mState, "LM_D")              Then MapRemove($mState, "LM_D")
-		If MapExists($mState, "LM_gradient")       Then MapRemove($mState, "LM_gradient")
-		If MapExists($mState, "LM_step")           Then MapRemove($mState, "LM_step")
-		If MapExists($mState, "EquilibrationScale") Then MapRemove($mState, "EquilibrationScale")
+		; Warm-start: between IRLS iterations only the weights change; x* is
+		; already very close to the fixed point, so GN converges in 1–2 inner
+		; steps instead of the 10–100 a full reset demands.
+		; LM is excluded: its clean-GN tail strips fLMLambda/LM_D/LM_gradient,
+		; and with nIterations retained the update branch in __adj_solveIteration
+		; would run against a Null LM_D (init branch is gated on nIterations,
+		; so it wouldn't rebuild either). Safer to let LM restart clean.
+		If $mConfig.algorithm = "LM" Then
+			If MapExists($mState, "nIterations")      Then MapRemove($mState, "nIterations")
+			If MapExists($mState, "r_accumulated")     Then MapRemove($mState, "r_accumulated")
+			If MapExists($mState, "LM_D")              Then MapRemove($mState, "LM_D")
+			If MapExists($mState, "LM_gradient")       Then MapRemove($mState, "LM_gradient")
+			If MapExists($mState, "LM_step")           Then MapRemove($mState, "LM_step")
+			If MapExists($mState, "EquilibrationScale") Then MapRemove($mState, "EquilibrationScale")
+		EndIf
 
 		__adj_solveNonlinear($mSystem, $mState)
 		If @error Then Return SetError(@error, @extended, Null)
