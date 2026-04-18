@@ -550,7 +550,7 @@ Func __adj_computeRedundancy(ByRef $mSystem, ByRef $mState)
 	If Not MapExists($mResults, "Qvv") Then Return
 
 	If $mState.hasCovariances Then
-		; generalized: diag(R) = diag(P · Qvv) where P = Σ⁻¹
+		; generalized: diag(R) = diag(P · Qvv) where P = Σ⁻¹ = L⁻ᵀ·L⁻¹
 		Local $iPobs = $mState.nObs
 		Local $mPQvv = _la_duplicate($mResults.Qvv)
 		_blas_trsm($mState.CovCholeskyL, $mPQvv.ptr, 1.0, "L", "L", "N", "N", $iPobs, $iPobs, $iPobs, $iPobs)
@@ -560,6 +560,15 @@ Func __adj_computeRedundancy(ByRef $mSystem, ByRef $mState)
 		; diagonal: diag(R) = diag(Qvv) · p = diag(Qvv) / σ²
 		Local $mDiagQvv = _la_getDiag($mResults.Qvv)
 		$mResults.redundancyDiag = _la_mul($mDiagQvv, _la_squareElements($mState.Vector_ObsInvStdDev))
+	EndIf
+
+	; sanity check: tr(R) = Σrᵢ must equal f (degrees of freedom).
+	; mismatch indicates broken P, Qvv, or whitening — exposes future regressions.
+	Local $fTrace = _la_sum($mResults.redundancyDiag)
+	Local $fDof   = $mResults.f
+	Local $fTol   = 1e-8 * (1 + Abs($fDof))
+	If Abs($fTrace - $fDof) > $fTol Then
+		$mResults.redundancyTraceMismatch = $fTrace - $fDof
 	EndIf
 
 	$mSystem.results = $mResults

@@ -910,6 +910,11 @@ Func _adj_getResults(ByRef $mSystem)
 	$mRet.sdyhat   = $mSdyhat
 	$mRet.r        = $mRedundancy
 
+	; --- Sanity check warning (Σrᵢ = f) ---
+	If MapExists($mResults, "redundancyTraceMismatch") Then
+		$mRet.redundancyTraceMismatch = $mResults.redundancyTraceMismatch
+	EndIf
+
 	; --- Raw cofactor matrices ---
 	$mRet.Qxx   = MapExists($mResults, "Qxx")   ? $mResults.Qxx   : Null
 	$mRet.Qvv   = MapExists($mResults, "Qvv")   ? $mResults.Qvv   : Null
