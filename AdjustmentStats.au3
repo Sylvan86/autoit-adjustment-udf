@@ -215,11 +215,13 @@ Func __adj_computeQxx(ByRef $mSystem, ByRef $mState)
 			__adj_fillLowerFromUpper($mQxxFull, $iNpar)
 
 			$mResults.Qxx = $mQxxFull
+			$mState.fConditionNumber = _la_conditionNumber($mQxxFull, "1", False)
 			$mSystem.results = $mResults
 			Return $mT
 		Else
 			__adj_fillLowerFromUpper($mQxx, $iN)
 			$mResults.Qxx = $mQxx
+			$mState.fConditionNumber = _la_conditionNumber($mQxx, "1", False)
 			$mSystem.results = $mResults
 			Return $mS
 		EndIf
@@ -280,6 +282,7 @@ Func __adj_computeQxx(ByRef $mSystem, ByRef $mState)
 		__adj_fillLowerFromUpper($mQxx, $iNpar)
 
 		$mResults.Qxx = $mQxx
+		$mState.fConditionNumber = _la_conditionNumber($mQxx, "1", False)
 		$mSystem.results = $mResults
 		Return $mT  ; return T for cofactor matrix computation
 	Else
@@ -290,6 +293,8 @@ Func __adj_computeQxx(ByRef $mSystem, ByRef $mState)
 		__adj_fillLowerFromUpper($mQxx, $iN)
 
 		$mResults.Qxx = $mQxx
+		; cond(Qxx) = cond(N) since Qxx = N⁻¹; works on a copy so Qxx stays intact.
+		$mState.fConditionNumber = _la_conditionNumber($mQxx, "1", False)
 		$mSystem.results = $mResults
 		Return $mS
 	EndIf
