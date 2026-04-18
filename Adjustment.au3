@@ -698,10 +698,14 @@ Func _adj_defaultConfig($sAlgorithm = "LM", $bVCE = False, $iMaxIter = $__ADJ_MA
 	; lets pathological cases (Biweight with re-descending weights) spin for the
 	; full cap before stopping. 10 is a safe upper bound.
 	$mCfg.robustInnerMaxIter = 10
-	; cascade-init (MM-estimator pattern): run Huber first, then redescending. Default ON
-	; for non-convex estimators (Biweight, Hampel, BIBER) since Huber's convex global minimum
-	; provides a much better starting point than the non-robust solve alone.
-	$mCfg.robustCascadeInit    = True
+	; Cascade-init (MM-estimator pattern): run Huber first, then the user's
+	; redescending estimator. Huber's convex global minimum provides a better
+	; starting point than the non-robust solve when residuals are badly
+	; contaminated. Default OFF to avoid the ~15-iteration Huber warm-up in
+	; the common case of mildly-contaminated data; users facing catastrophic
+	; outliers should set robustCascadeInit = True explicitly (Yohai 1987,
+	; Maronna et al. 2006). Only applies to Biweight, Hampel, BIBER.
+	$mCfg.robustCascadeInit    = False
 	$mCfg.robustCascadeMaxIter = 15
 
 	; iterative data snooping (mutually exclusive with robust)
