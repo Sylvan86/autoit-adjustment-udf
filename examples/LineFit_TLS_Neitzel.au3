@@ -34,7 +34,7 @@
 
 
 ; -- Model setup --------------------------------------------------------------
-Local $mSystem
+Global $mSystem
 
 ; Observations: x and y coordinates (all with sigma = 1 -> unit weights)
 ;
@@ -82,9 +82,9 @@ ConsoleWrite(_adj_displayResults($mSystem))
 
 
 ; -- Validation vs. reference values (Neitzel & Petrovic 2008, Table 3) -------
-Local $mRes = _adj_getResults($mSystem)
-Local $mX1  = $mRes.x1
-Local $mSdx = $mRes.sdx
+Global $mRes = _adj_getResults($mSystem)
+Global $mX1  = $mRes.x1
+Global $mSdx = $mRes.sdx
 
 ConsoleWrite(@CRLF)
 ConsoleWrite("===================================================" & @CRLF)

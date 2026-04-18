@@ -40,7 +40,7 @@
 
 
 ; -- Model setup --------------------------------------------------------------------
-Local $mSystem
+Global $mSystem
 
 ; Observations: 5 measurements of a single mean β₁
 ; Functional model:  yᵢ = β₁
@@ -81,8 +81,8 @@ ConsoleWrite(_adj_displayResults($mSystem))
 ;
 ; The adjusted mean β₁ can be verified against the weighted mean.
 
-Local $mRes = _adj_getResults($mSystem)
-Local $mX1  = $mRes.x1
+Global $mRes = _adj_getResults($mSystem)
+Global $mX1  = $mRes.x1
 
 ConsoleWrite(@CRLF)
 ConsoleWrite("===================================================" & @CRLF)
@@ -105,9 +105,9 @@ _check("VCE converged", ($mRes.vceConverged ? 1 : 0), 1, 0)
 
 ; After VCE, both group variance factors should be near 1.0
 ; Koch final values (iteration 3): σ₁² ≈ 0.99, σ₂² ≈ 1.01
-Local $mGroups = $mRes.vceGroups
-Local $mGrp1 = $mGroups["grp1"]
-Local $mGrp2 = $mGroups["grp2"]
+Global $mGroups = $mRes.vceGroups
+Global $mGrp1 = $mGroups["grp1"]
+Global $mGrp2 = $mGroups["grp2"]
 
 ConsoleWrite(@CRLF & "Per-group variance factors (should be near 1.0):" & @CRLF)
 _check("σ²(grp1)", $mGrp1.sigma2, 1.0, 0)

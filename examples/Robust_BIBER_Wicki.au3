@@ -39,7 +39,7 @@
 
 
 ; ── Model setup ───────────────────────────────────────────────────────────────
-Local $mSystem
+Global $mSystem
 
 ; Observations: leveled height differences Δh [mm] with σ = 1/√pᵢ [mm]
 ; Functional model:  Δhᵢⱼ = Hⱼ − Hᵢ  (datum: H9 = 0, so H9 drops out)
@@ -76,11 +76,11 @@ _adj_setInitialValue($mSystem, "H11", 0.0)
 
 
 ; ── Adjustment ────────────────────────────────────────────────────────────────
-Local $mParams = _adj_robustDefaults("BIBER")
+Global $mParams = _adj_robustDefaults("BIBER")
 $mParams.c = 3.5
 $mParams.scale = "apriori"   ; Wicki uses σ₀=1 (a-priori model), no scale estimation
 $mParams.outlierThreshold = 3.49   ; just below c so that outliers are flagged
-Local $mConfig = _adj_defaultConfig("GN", False)
+Global $mConfig = _adj_defaultConfig("GN", False)
 $mConfig.robust = "BIBER"
 $mConfig.robustParams = $mParams
 
@@ -92,7 +92,7 @@ EndIf
 
 
 ; ── Results ───────────────────────────────────────────────────────────────────
-Local $mDisplay = _adj_defaultDisplayConfig()
+Global $mDisplay = _adj_defaultDisplayConfig()
 $mDisplay.showRobust = True
 $mDisplay.showGlobalTest = True
 $mDisplay.obsCols = "name|value|v|sdv|r|w|robW"
@@ -100,8 +100,8 @@ ConsoleWrite(_adj_displayResults($mSystem, $mDisplay) & @CRLF)
 
 
 ; ── Validation vs. reference values (Wicki 1998, pp. 151–157) ─────────────────
-Local $mRes = _adj_getResults($mSystem)
-Local $mX1  = $mRes.x1
+Global $mRes = _adj_getResults($mSystem)
+Global $mX1  = $mRes.x1
 
 ConsoleWrite(@CRLF)
 ConsoleWrite("╔═══════════════════════════════════════════════════╗" & @CRLF)
@@ -131,10 +131,10 @@ ConsoleWrite("  Robust scale:    " & StringFormat("%.4f", $mRes.robustScale) & @
 
 ; ─── Robust weights — outlier detection ───
 ConsoleWrite(@CRLF & "Robust weights (outliers marked with *):" & @CRLF)
-Local $mWeights = $mRes.robustWeights
+Global $mWeights = $mRes.robustWeights
 For $i = 1 To 9
-	Local $sName = "OBS" & $i
-	Local $sFlag = ""
+	Global $sName = "OBS" & $i
+	Global $sFlag = ""
 	If $mWeights[$sName] < 1.0 Then $sFlag = " *"
 	ConsoleWrite(StringFormat("  %5s: rob.w = %.4f%s", $sName, $mWeights[$sName], $sFlag) & @CRLF)
 Next

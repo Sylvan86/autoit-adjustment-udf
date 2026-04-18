@@ -35,7 +35,7 @@
 
 
 ; -- Model setup -----------------------------------------------------------------
-Local $mSystem
+Global $mSystem
 
 ; Observations: y = f(x) + e
 ; Functional model:  y = b1 * (1 - exp(-b2 * x))
@@ -61,9 +61,9 @@ _adj_setInitialValue($mSystem, "B2", 0.75)
 
 
 ; -- Adjustment ------------------------------------------------------------------
-Local $mConfig = _adj_defaultConfig("LM", False)
+Global $mConfig = _adj_defaultConfig("LM", False)
 $mConfig.solver = "SVD"
-Local $mDiagCfg = $mConfig.diagnostics
+Global $mDiagCfg = $mConfig.diagnostics
 $mDiagCfg.testBasis = "pope"
 $mConfig.diagnostics = $mDiagCfg
 _adj_solve($mSystem, $mConfig)
@@ -74,16 +74,16 @@ EndIf
 
 
 ; -- Results ---------------------------------------------------------------------
-Local $mDisplay = _adj_defaultDisplayConfig()
+Global $mDisplay = _adj_defaultDisplayConfig()
 $mDisplay.obsCols = "name|value|v|r|w|T|pPope|decision|mdb"
 $mDisplay.showGlobalTest = True
 ConsoleWrite(_adj_displayResults($mSystem, $mDisplay))
 
 
 ; -- Validation vs. NIST certified values ----------------------------------------
-Local $mRes = _adj_getResults($mSystem)
-Local $mX1  = $mRes.x1
-Local $mSdx = $mRes.sdx
+Global $mRes = _adj_getResults($mSystem)
+Global $mX1  = $mRes.x1
+Global $mSdx = $mRes.sdx
 
 ConsoleWrite(@CRLF)
 ConsoleWrite("+===================================================+" & @CRLF)

@@ -35,10 +35,10 @@
 
 
 ; -- Model setup -----------------------------------------------------------------
-Local $mSystem
+Global $mSystem
 
 ; 250 data points (y, x)
-Local $aData[][2] = [ _
+Global $aData[][2] = [ _
 	[      97.58776,              1], _
 	[      97.76344,              2], _
 	[      96.56705,              3], _
@@ -293,8 +293,8 @@ Local $aData[][2] = [ _
 
 ; Build observation equations
 For $i = 0 To UBound($aData) - 1
-	Local $sX = StringFormat("%.15g", $aData[$i][1])
-	Local $sFormula = "B1*Exp(-B2*" & $sX & ") + B3*Exp(-((" & $sX & " - B4)^2)/B5^2) + B6*Exp(-((" & $sX & " - B7)^2)/B8^2)"
+	Global $sX = StringFormat("%.15g", $aData[$i][1])
+	Global $sFormula = "B1*Exp(-B2*" & $sX & ") + B3*Exp(-((" & $sX & " - B4)^2)/B5^2) + B6*Exp(-((" & $sX & " - B7)^2)/B8^2)"
 	_adj_addObsFunction($mSystem, "y" & ($i + 1), $sFormula, $aData[$i][0])
 Next
 
@@ -310,8 +310,8 @@ _adj_setInitialValue($mSystem, "B8", 25.0)
 
 
 ; -- Adjustment ------------------------------------------------------------------
-Local $mConfig = _adj_defaultConfig("LM", False)
-Local $mDiagCfg = $mConfig.diagnostics
+Global $mConfig = _adj_defaultConfig("LM", False)
+Global $mDiagCfg = $mConfig.diagnostics
 $mDiagCfg.testBasis = "pope"
 $mConfig.diagnostics = $mDiagCfg
 _adj_solve($mSystem, $mConfig)
@@ -322,7 +322,7 @@ EndIf
 
 
 ; -- Results ---------------------------------------------------------------------
-Local $mDisplay = _adj_defaultDisplayConfig()
+Global $mDisplay = _adj_defaultDisplayConfig()
 $mDisplay.obsCols = "name|value|v|r|w|T|pPope|decision|mdb"
 $mDisplay.showGlobalTest = True
 ConsoleWrite(_adj_displayResults($mSystem, $mDisplay))
@@ -340,9 +340,9 @@ ConsoleWrite(_adj_displayResults($mSystem, $mDisplay))
 ;   b8 =     1.9668221230E+01    sd(b8) = 3.7806634336E-01
 ;   Residual SS = 1.2444846360E+03
 
-Local $mRes = _adj_getResults($mSystem)
-Local $mX1  = $mRes.x1
-Local $mSdx = $mRes.sdx
+Global $mRes = _adj_getResults($mSystem)
+Global $mX1  = $mRes.x1
+Global $mSdx = $mRes.sdx
 
 ConsoleWrite(@CRLF)
 ConsoleWrite("+===================================================+" & @CRLF)

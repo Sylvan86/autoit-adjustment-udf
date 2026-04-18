@@ -45,12 +45,12 @@
 ; -- Fixed points -------------------------------------------------------------------
 ;   Point 1:  x = 0.0000 m,  y = 1000.0000 m
 ;   Point 2:  x = 1000.0000 m,  y = 1000.0000 m
-Local Const $fX1 = 0.0, $fY1 = 1000.0
-Local Const $fX2 = 1000.0, $fY2 = 1000.0
+Global Const $fX1 = 0.0, $fY1 = 1000.0
+Global Const $fX2 = 1000.0, $fY2 = 1000.0
 
 
 ; -- Model setup --------------------------------------------------------------------
-Local $mSystem
+Global $mSystem
 
 ; Observations: horizontal distances [m] with σ = 0.010 m
 ; Functional model:  sᵢⱼ = Sqrt((xⱼ − xᵢ)² + (yⱼ − yᵢ)²)
@@ -61,7 +61,7 @@ Local $mSystem
 ;   s_23     2    3    1414.2400    0.010
 ;   s_24     2    4     999.9800    0.010
 ;   s_34     3    4    1000.0000    0.010
-Local $sFunc
+Global $sFunc
 
 $sFunc = StringFormat("Sqrt((x3 - %.4f)^2 + (y3 - %.4f)^2)", $fX1, $fY1)
 _adj_addObsFunction($mSystem, "s_13", $sFunc, 1000.0200, 0.010)
@@ -103,10 +103,10 @@ ConsoleWrite(_adj_displayResults($mSystem))
 ;   UDF:   v = l̂ − l   (adjusted minus observed)
 ;   Krumm: ê = l − l̂   (observed minus adjusted)  →  v_UDF = −ê_Krumm
 
-Local $mRes = _adj_getResults($mSystem)
-Local $mX1  = $mRes.x1
-Local $mSdx = $mRes.sdx
-Local $mV   = $mRes.v
+Global $mRes = _adj_getResults($mSystem)
+Global $mX1  = $mRes.x1
+Global $mSdx = $mRes.sdx
+Global $mV   = $mRes.v
 
 ConsoleWrite(@CRLF)
 ConsoleWrite("===================================================" & @CRLF)

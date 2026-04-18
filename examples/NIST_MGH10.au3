@@ -35,10 +35,10 @@
 
 
 ; -- Model setup -----------------------------------------------------------------
-Local $mSystem
+Global $mSystem
 
 ; 16 data points (y, x)
-Local $aData[][2] = [ _
+Global $aData[][2] = [ _
 	[         34780,             50], _
 	[         28610,             55], _
 	[         23650,             60], _
@@ -59,8 +59,8 @@ Local $aData[][2] = [ _
 
 ; Build observation equations
 For $i = 0 To UBound($aData) - 1
-	Local $sX = StringFormat("%.15g", $aData[$i][1])
-	Local $sFormula = "B1*Exp(B2/(" & $sX & " + B3))"
+	Global $sX = StringFormat("%.15g", $aData[$i][1])
+	Global $sFormula = "B1*Exp(B2/(" & $sX & " + B3))"
 	_adj_addObsFunction($mSystem, "y" & ($i + 1), $sFormula, $aData[$i][0])
 Next
 
@@ -71,8 +71,8 @@ _adj_setInitialValue($mSystem, "B3", 250)
 
 
 ; -- Adjustment ------------------------------------------------------------------
-Local $mConfig = _adj_defaultConfig("LM", False)
-Local $mDiagCfg = $mConfig.diagnostics
+Global $mConfig = _adj_defaultConfig("LM", False)
+Global $mDiagCfg = $mConfig.diagnostics
 $mDiagCfg.testBasis = "pope"
 $mConfig.diagnostics = $mDiagCfg
 _adj_solve($mSystem, $mConfig)
@@ -83,7 +83,7 @@ EndIf
 
 
 ; -- Results ---------------------------------------------------------------------
-Local $mDisplay = _adj_defaultDisplayConfig()
+Global $mDisplay = _adj_defaultDisplayConfig()
 $mDisplay.obsCols = "name|value|v|r|w|T|pPope|decision|mdb"
 $mDisplay.showGlobalTest = True
 ConsoleWrite(_adj_displayResults($mSystem, $mDisplay))
@@ -96,9 +96,9 @@ ConsoleWrite(_adj_displayResults($mSystem, $mDisplay))
 ;   b3 =     3.4522363462E+02    sd(b3) = 7.8486103508E-01
 ;   Residual SS = 8.7945855171E+01
 
-Local $mRes = _adj_getResults($mSystem)
-Local $mX1  = $mRes.x1
-Local $mSdx = $mRes.sdx
+Global $mRes = _adj_getResults($mSystem)
+Global $mX1  = $mRes.x1
+Global $mSdx = $mRes.sdx
 
 ConsoleWrite(@CRLF)
 ConsoleWrite("+===================================================+" & @CRLF)

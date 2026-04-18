@@ -35,13 +35,13 @@
 
 
 ; -- Model setup -----------------------------------------------------------------
-Local $mSystem
+Global $mSystem
 
 ; Observations: y = f(x) + e
 ; Functional model:  y = (b1 + b2*x + b3*x^2 + b4*x^3) / (1 + b5*x + b6*x^2 + b7*x^3)
 ;
 ; 37 data points (electron mobility vs. log density)
-Local $aData[][2] = [ _
+Global $aData[][2] = [ _
 	[ 80.574,  -3.067], _
 	[ 84.248,  -2.981], _
 	[ 87.264,  -2.921], _
@@ -87,18 +87,18 @@ Local $aData[][2] = [ _
 ;   dF/dBi (i=1..4) = x^(i-1) / q               (numerator params)
 ;   dF/dBi (i=5..7) = -x^(i-4) * p / q²         (denominator params)
 For $i = 0 To UBound($aData) - 1
-	Local $fX = $aData[$i][1]
-	Local $fY = $aData[$i][0]
-	Local $sX = StringFormat("%.3f", $fX)
+	Global $fX = $aData[$i][1]
+	Global $fY = $aData[$i][0]
+	Global $sX = StringFormat("%.3f", $fX)
 
 	; Numerator p and denominator q as subexpressions
-	Local $sP = "(B1 + B2*(" & $sX & ") + B3*(" & $sX & ")^2 + B4*(" & $sX & ")^3)"
-	Local $sQ = "(1 + B5*(" & $sX & ") + B6*(" & $sX & ")^2 + B7*(" & $sX & ")^3)"
+	Global $sP = "(B1 + B2*(" & $sX & ") + B3*(" & $sX & ")^2 + B4*(" & $sX & ")^3)"
+	Global $sQ = "(1 + B5*(" & $sX & ") + B6*(" & $sX & ")^2 + B7*(" & $sX & ")^3)"
 
-	Local $sFormula = $sP & " / " & $sQ
+	Global $sFormula = $sP & " / " & $sQ
 
 	; Analytical derivatives (note: use -1* instead of - prefix to avoid precedence issues with ^)
-	Local $sDeriv = "B1 = 1 / " & $sQ _
+	Global $sDeriv = "B1 = 1 / " & $sQ _
 	    & " | B2 = (" & $sX & ") / " & $sQ _
 	    & " | B3 = (" & $sX & ")^2 / " & $sQ _
 	    & " | B4 = (" & $sX & ")^3 / " & $sQ _
@@ -119,9 +119,9 @@ _adj_setInitialValue($mSystem, "B7", 0.05)
 
 
 ; -- Adjustment ------------------------------------------------------------------
-Local $mConfig = _adj_defaultConfig("LM", False)
+Global $mConfig = _adj_defaultConfig("LM", False)
 $mConfig.solver = "SVD"
-Local $mDiagCfg = $mConfig.diagnostics
+Global $mDiagCfg = $mConfig.diagnostics
 $mDiagCfg.testBasis = "pope"
 $mConfig.diagnostics = $mDiagCfg
 _adj_solve($mSystem, $mConfig)
@@ -132,7 +132,7 @@ EndIf
 
 
 ; -- Results ---------------------------------------------------------------------
-Local $mDisplay = _adj_defaultDisplayConfig()
+Global $mDisplay = _adj_defaultDisplayConfig()
 $mDisplay.obsCols = "name|value|v|r|w|T|pPope|decision|mdb"
 $mDisplay.showGlobalTest = True
 ConsoleWrite(_adj_displayResults($mSystem, $mDisplay))
@@ -149,9 +149,9 @@ ConsoleWrite(_adj_displayResults($mSystem, $mDisplay))
 ;   b7 = 4.9727297349E-02    sd(b7) = 6.5842344623E-03
 ;   Residual SS = 5.6427082397E+03
 
-Local $mRes = _adj_getResults($mSystem)
-Local $mX1  = $mRes.x1
-Local $mSdx = $mRes.sdx
+Global $mRes = _adj_getResults($mSystem)
+Global $mX1  = $mRes.x1
+Global $mSdx = $mRes.sdx
 
 ConsoleWrite(@CRLF)
 ConsoleWrite("+===================================================+" & @CRLF)

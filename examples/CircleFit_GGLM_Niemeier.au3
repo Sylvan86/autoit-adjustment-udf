@@ -36,21 +36,21 @@
 
 ; -- Observation data ---------------------------------------------------------
 ; Distances [m]
-Local $aD[] = [ _
+Global $aD[] = [ _
 	156.5221, 161.9524, 159.2147, 148.6576, 131.7163, 111.2273, _
 	 92.1938,  82.2948,  87.4644, 104.4039, 125.1007, 143.6252]
 
 ; Directions [gon]
-Local $aT[] = [ _
+Global $aT[] = [ _
 	70.48282, 62.48844, 54.34595, 46.97062, 41.55401, 39.98572, _
 	45.11189, 58.42577, 73.50564, 81.44536, 81.75780, 77.36336]
 
 ; Standard deviations
-Local $fSigmaD = 0.002    ; [m] for distances
-Local $fSigmaT = 0.0003   ; [gon] for directions
+Global $fSigmaD = 0.002    ; [m] for distances
+Global $fSigmaT = 0.0003   ; [gon] for directions
 
 ; Covariance between adjacent distances (GGLM only)
-Local $fCovDD = 0.000001   ; [m²]  (correlation rho ~ 0.25)
+Global $fCovDD = 0.000001   ; [m²]  (correlation rho ~ 0.25)
 
 
 ; ===============================================================================
@@ -61,8 +61,8 @@ ConsoleWrite("===============================================================" &
 ConsoleWrite("  WGLM: Diagonal covariance matrix" & @CRLF)
 ConsoleWrite("===============================================================" & @CRLF & @CRLF)
 
-Local $mWGLM
-Local $i
+Global $mWGLM
+Global $i
 
 ; Add distance observations  D₁ .. D₁₂
 For $i = 0 To 11
@@ -79,8 +79,8 @@ Next
 ;
 ; Note: gon -> rad conversion:  rad = gon * pi / 200
 ; In AutoIt/UDF formulas, use  ACOS(-1)/200  for pi/200.
-Local Const $sPiOver200 = "acos(-1)/200"
-Local $sD, $sT, $sFormula
+Global Const $sPiOver200 = "acos(-1)/200"
+Global $sD, $sT, $sFormula
 For $i = 1 To 12
 	$sD = "#D" & $i
 	$sT = "#T" & $i
@@ -101,14 +101,14 @@ If @error Then
 	Exit 1
 EndIf
 
-Local $mDisplay = _adj_defaultDisplayConfig()
+Global $mDisplay = _adj_defaultDisplayConfig()
 $mDisplay.obsCols = "name|value|v|r|w|p|decision|mdb"
 $mDisplay.showGlobalTest = True
 ConsoleWrite(_adj_displayResults($mWGLM, $mDisplay))
 
 ; Validation (Niemeier 2008, p. 181)
-Local $mResW = _adj_getResults($mWGLM)
-Local $mXW   = $mResW.x1
+Global $mResW = _adj_getResults($mWGLM)
+Global $mXW   = $mResW.x1
 
 ConsoleWrite(@CRLF & "Validation vs. Reference (Niemeier 2008, WGLM):" & @CRLF)
 _check("XM",  $mXW["XM"], 70.000, 3)
@@ -127,7 +127,7 @@ ConsoleWrite("===============================================================" &
 ConsoleWrite("  GGLM: With off-diagonal covariances" & @CRLF)
 ConsoleWrite("===============================================================" & @CRLF & @CRLF)
 
-Local $mGGLM
+Global $mGGLM
 
 ; Add same observations
 For $i = 0 To 11
@@ -166,15 +166,15 @@ If @error Then
 	Exit 1
 EndIf
 
-Local $mDisplay = _adj_defaultDisplayConfig()
+$mDisplay = _adj_defaultDisplayConfig()
 $mDisplay.obsCols = "name|value|v|r|w|p|decision|mdb"
 $mDisplay.showGlobalTest = True
 ConsoleWrite(_adj_displayResults($mGGLM, $mDisplay))
 
 ; Validation — Niemeier provides the same parameter values for both variants
 ; (simulated data -> round values). The Q_xx matrix differs.
-Local $mResG = _adj_getResults($mGGLM)
-Local $mXG   = $mResG.x1
+Global $mResG = _adj_getResults($mGGLM)
+Global $mXG   = $mResG.x1
 
 ConsoleWrite(@CRLF & "Validation vs. Reference (Niemeier 2008, GGLM):" & @CRLF)
 _check("XM",  $mXG["XM"], 70.000, 3)

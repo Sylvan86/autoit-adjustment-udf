@@ -40,7 +40,7 @@
 
 
 ; -- Model setup --------------------------------------------------------------------
-Local $mSystem
+Global $mSystem
 
 ; Observations: leveled height differences Δh [m] with standard deviation σ [m]
 ; Functional model:  Δhᵢⱼ = Hⱼ − Hᵢ
@@ -87,10 +87,10 @@ ConsoleWrite(_adj_displayResults($mSystem))
 ;   UDF:   v = l̂ − l   (adjusted minus observed)
 ;   Krumm: ê = l − l̂   (observed minus adjusted)  →  v_UDF = −ê_Krumm
 
-Local $mRes = _adj_getResults($mSystem)
-Local $mX1  = $mRes.x1
-Local $mSdx = $mRes.sdx
-Local $mV   = $mRes.v
+Global $mRes = _adj_getResults($mSystem)
+Global $mX1  = $mRes.x1
+Global $mSdx = $mRes.sdx
+Global $mV   = $mRes.v
 
 ConsoleWrite(@CRLF)
 ConsoleWrite("===================================================" & @CRLF)

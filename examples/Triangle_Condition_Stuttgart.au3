@@ -36,7 +36,7 @@ Global Const $fDeg2Rad = 3.14159265358979323846 / 180.0
 
 
 ; -- Model setup ------------------------------------------------------
-Local $mSystem
+Global $mSystem
 
 ; Observations with weights P = diag(1, 0.1, 1, 0.2)
 ; sigma_i = 1/sqrt(P_i) (assuming sigma_0 = 1)
@@ -71,8 +71,8 @@ ConsoleWrite(_adj_displayResults($mSystem))
 
 
 ; -- Validation vs. reference values (Stuttgart, Ex. 5.2.2) -----------
-Local $mRes = _adj_getResults($mSystem)
-Local $mV   = $mRes.v
+Global $mRes = _adj_getResults($mSystem)
+Global $mV   = $mRes.v
 
 ConsoleWrite(@CRLF)
 ConsoleWrite("===================================================" & @CRLF)
@@ -94,8 +94,8 @@ ConsoleWrite(StringFormat("  v(a)     = %+.6e m", $mV["A"]) & @CRLF)
 ConsoleWrite(StringFormat("  v(b)     = %+.6e m", $mV["B"]) & @CRLF)
 
 ; Convert angle residuals from radians to degrees/minutes/seconds
-Local $fVAlpha_deg = $mV["ALPHA"] / $fDeg2Rad
-Local $fVBeta_deg  = $mV["BETA"]  / $fDeg2Rad
+Global $fVAlpha_deg = $mV["ALPHA"] / $fDeg2Rad
+Global $fVBeta_deg  = $mV["BETA"]  / $fDeg2Rad
 
 ConsoleWrite(StringFormat("  v(alpha) = %+.6e rad = ", $mV["ALPHA"]) & _fmtDMS($fVAlpha_deg) & @CRLF)
 ConsoleWrite(StringFormat("  v(beta)  = %+.6e rad = ", $mV["BETA"])  & _fmtDMS($fVBeta_deg) & @CRLF)
@@ -112,11 +112,11 @@ ConsoleWrite("  e_alpha = +6' 26.241""" & @CRLF)
 ConsoleWrite("  e_beta  = -1d 55' 42.492""" & @CRLF)
 
 ; Verification: sine rule must hold for adjusted observations
-Local $fAadj     = $mRes.obsAdj["A"]
-Local $fBadj     = $mRes.obsAdj["B"]
-Local $fAlphaAdj = $mRes.obsAdj["ALPHA"]
-Local $fBetaAdj  = $mRes.obsAdj["BETA"]
-Local $fCheck    = $fAadj * Sin($fBetaAdj) - $fBadj * Sin($fAlphaAdj)
+Global $fAadj     = $mRes.obsAdj["A"]
+Global $fBadj     = $mRes.obsAdj["B"]
+Global $fAlphaAdj = $mRes.obsAdj["ALPHA"]
+Global $fBetaAdj  = $mRes.obsAdj["BETA"]
+Global $fCheck    = $fAadj * Sin($fBetaAdj) - $fBadj * Sin($fAlphaAdj)
 ConsoleWrite(@CRLF & StringFormat("Sine rule check (should be 0): %.6e", $fCheck) & @CRLF)
 
 

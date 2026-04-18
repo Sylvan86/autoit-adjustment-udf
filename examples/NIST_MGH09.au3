@@ -35,10 +35,10 @@
 
 
 ; -- Model setup -----------------------------------------------------------------
-Local $mSystem
+Global $mSystem
 
 ; 11 data points (y, x)
-Local $aData[][2] = [ _
+Global $aData[][2] = [ _
 	[        0.1957,              4], _
 	[        0.1947,              2], _
 	[        0.1735,              1], _
@@ -54,8 +54,8 @@ Local $aData[][2] = [ _
 
 ; Build observation equations
 For $i = 0 To UBound($aData) - 1
-	Local $sX = StringFormat("%.15g", $aData[$i][1])
-	Local $sFormula = "B1*(" & $sX & "^2 + " & $sX & "*B2)/(" & $sX & "^2 + " & $sX & "*B3 + B4)"
+	Global $sX = StringFormat("%.15g", $aData[$i][1])
+	Global $sFormula = "B1*(" & $sX & "^2 + " & $sX & "*B2)/(" & $sX & "^2 + " & $sX & "*B3 + B4)"
 	_adj_addObsFunction($mSystem, "y" & ($i + 1), $sFormula, $aData[$i][0])
 Next
 
@@ -67,8 +67,8 @@ _adj_setInitialValue($mSystem, "B4", 0.39)
 
 
 ; -- Adjustment ------------------------------------------------------------------
-Local $mConfig = _adj_defaultConfig("LM", False)
-Local $mDiagCfg = $mConfig.diagnostics
+Global $mConfig = _adj_defaultConfig("LM", False)
+Global $mDiagCfg = $mConfig.diagnostics
 $mDiagCfg.testBasis = "pope"
 $mConfig.diagnostics = $mDiagCfg
 _adj_solve($mSystem, $mConfig)
@@ -79,7 +79,7 @@ EndIf
 
 
 ; -- Results ---------------------------------------------------------------------
-Local $mDisplay = _adj_defaultDisplayConfig()
+Global $mDisplay = _adj_defaultDisplayConfig()
 $mDisplay.obsCols = "name|value|v|r|w|T|pPope|decision|mdb"
 $mDisplay.showGlobalTest = True
 ConsoleWrite(_adj_displayResults($mSystem, $mDisplay))
@@ -93,9 +93,9 @@ ConsoleWrite(_adj_displayResults($mSystem, $mDisplay))
 ;   b4 =     1.3606233068E-01    sd(b4) = 9.0025542308E-02
 ;   Residual SS = 3.0750560385E-04
 
-Local $mRes = _adj_getResults($mSystem)
-Local $mX1  = $mRes.x1
-Local $mSdx = $mRes.sdx
+Global $mRes = _adj_getResults($mSystem)
+Global $mX1  = $mRes.x1
+Global $mSdx = $mRes.sdx
 
 ConsoleWrite(@CRLF)
 ConsoleWrite("+===================================================+" & @CRLF)

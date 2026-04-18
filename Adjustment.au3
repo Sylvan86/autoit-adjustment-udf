@@ -992,7 +992,7 @@ Func __adj_dataSnooping(ByRef $mSystem, $mConfig)
 	WEnd
 
 	; attach report to results of the *last* solve
-	Local $mResults = $mSystem.results
+	$mResults = $mSystem.results
 	$mResults.snoopingReport     = $aReport
 	$mResults.snoopingConverged  = $bConverged
 	$mResults.snoopingIterations = $iIter
@@ -1470,7 +1470,7 @@ Func __adj_parseDerivativeInput($vInput)
 	; parse pipe-delimited string: "X=2*X | Y=2*Y"
 	If IsString($vInput) Then
 		Local $mResult[], $aParts = StringSplit($vInput, "|", 2)
-		Local $sPart, $iEq, $sKey
+		Local $sPart, $iEq
 		For $sPart In $aParts
 			$sPart = StringStripWS($sPart, 3)
 			If $sPart = "" Then ContinueLoop

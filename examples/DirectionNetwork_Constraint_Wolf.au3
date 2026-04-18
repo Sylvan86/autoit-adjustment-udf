@@ -47,7 +47,7 @@
 
 ; -- Point coordinates [m] (Table 5.42) ------------------------------------------
 ;    Fixed (A-F): known coordinates.  New (G-I): approximate coordinates.
-Local $mPt[]
+Global $mPt[]
 $mPt["A"] = _pt(184423.28, 726419.33)
 $mPt["B"] = _pt(186444.18, 726476.66)
 $mPt["C"] = _pt(183257.84, 725490.35)
@@ -59,13 +59,13 @@ $mPt["H"] = _pt(186579.30, 725336.60)
 $mPt["I"] = _pt(185963.07, 723322.02)
 
 ; New points: coordinates are estimated parameters (XG, YG, XH, YH, XI, YI)
-Local $mNewPt[]
+Global $mNewPt[]
 $mNewPt["G"] = True
 $mNewPt["H"] = True
 $mNewPt["I"] = True
 
 ; -- Approximate orientation unknowns [gon] (Table 5.43, omega_0) ----------------
-Local $mR0[]
+Global $mR0[]
 $mR0["A"] = 98.196
 $mR0["B"] = 192.486
 $mR0["C"] = 57.164
@@ -76,12 +76,12 @@ $mR0["G"] = 55.215
 $mR0["H"] = 197.451
 $mR0["I"] = 18.903
 
-Local Const $fSigmaR = 0.0025  ; 2.5 mgon
+Global Const $fSigmaR = 0.0025  ; 2.5 mgon
 
 
 ; -- Direction observations (Table 5.43) -----------------------------------------
 ;    Each row: [station, target, observed direction in gon]
-Local $aDirs[] = [ _
+Global $aDirs[] = [ _
 	"A","B",  0.0000,  "A","G", 80.5000,  "A","C",158.9610, _
 	"B","H",  0.0000,  "B","G", 62.7260,  "B","A",105.7120, _
 	"C","A",  0.0000,  "C","G", 56.4960,  "C","I", 85.8450,  "C","D",114.5950, _
@@ -95,20 +95,20 @@ Local $aDirs[] = [ _
 
 
 ; -- Model setup -----------------------------------------------------------------
-Local $mSystem
+Global $mSystem
 
 ; Add all direction observations
 For $i = 0 To UBound($aDirs) - 1 Step 3
-	Local $sFrom = $aDirs[$i], $sTo = $aDirs[$i + 1], $fDir = $aDirs[$i + 2]
-	Local $mF = $mPt[$sFrom], $mT = $mPt[$sTo]
+	Global $sFrom = $aDirs[$i], $sTo = $aDirs[$i + 1], $fDir = $aDirs[$i + 2]
+	Global $mF = $mPt[$sFrom], $mT = $mPt[$sTo]
 
 	; Formula: fixed-point coords are literal numbers, new-point coords are variable names
-	Local $sFc = MapExists($mNewPt, $sFrom) ? ("X" & $sFrom & ", Y" & $sFrom) : StringFormat("%.2f, %.2f", $mF.x, $mF.y)
-	Local $sTc = MapExists($mNewPt, $sTo)   ? ("X" & $sTo   & ", Y" & $sTo)   : StringFormat("%.2f, %.2f", $mT.x, $mT.y)
-	Local $sFunc = "_calcDirection_gon(" & $sFc & ", " & $sTc & ", R0" & $sFrom & ")"
+	Global $sFc = MapExists($mNewPt, $sFrom) ? ("X" & $sFrom & ", Y" & $sFrom) : StringFormat("%.2f, %.2f", $mF.x, $mF.y)
+	Global $sTc = MapExists($mNewPt, $sTo)   ? ("X" & $sTo   & ", Y" & $sTo)   : StringFormat("%.2f, %.2f", $mT.x, $mT.y)
+	Global $sFunc = "_calcDirection_gon(" & $sFc & ", " & $sTc & ", R0" & $sFrom & ")"
 
 	; Unwrap observed direction to match the Mod-free formula range
-	Local $fRaw = _calcBearing($mF.x, $mF.y, $mT.x, $mT.y) - $mR0[$sFrom]
+	Global $fRaw = _calcBearing($mF.x, $mF.y, $mT.x, $mT.y) - $mR0[$sFrom]
 	_adj_addObsFunction($mSystem, "r_" & $sFrom & "_" & $sTo, $sFunc, _unwrap($fDir, $fRaw), $fSigmaR)
 Next
 
@@ -143,8 +143,8 @@ ConsoleWrite(_adj_displayResults($mSystem))
 ;       DOF = 22).  This adapted model uses 36 dirs + 1 distance constraint
 ;       (LSE, DOF = 22).  Small deviations from reference values are expected.
 
-Local $mRes = _adj_getResults($mSystem)
-Local $mX1  = $mRes.x1
+Global $mRes = _adj_getResults($mSystem)
+Global $mX1  = $mRes.x1
 
 ConsoleWrite(@CRLF)
 ConsoleWrite("===================================================" & @CRLF)
@@ -173,7 +173,7 @@ _check("R0_I", $mX1["R0I"], 18.9001, 2)
 ConsoleWrite(@CRLF & "Statistical summary:" & @CRLF)
 _check("f", $mRes.f, 22, 0)
 
-Local $fDistGI = Sqrt(($mX1["XI"] - $mX1["XG"])^2 + ($mX1["YI"] - $mX1["YG"])^2)
+Global $fDistGI = Sqrt(($mX1["XI"] - $mX1["XG"])^2 + ($mX1["YI"] - $mX1["YG"])^2)
 ConsoleWrite(@CRLF & "Constraint check (dist G-I = 2121.90 m):" & @CRLF)
 _check("d_GI", $fDistGI, 2121.90, 2)
 

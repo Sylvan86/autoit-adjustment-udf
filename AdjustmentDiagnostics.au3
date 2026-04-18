@@ -338,7 +338,7 @@ Func __adj_computeReliability(ByRef $mSystem)
 	; (per-column BLAS scal — n_obs dispatches, each scaling n_params doubles)
 	For $sKey In MapKeys($mIdxObs)
 		Local $iIdx = $mIdxObs[$sKey]
-		Local $fRi  = __adj_vecGet($mVecRed, $iIdx)
+		$fRi  = __adj_vecGet($mVecRed, $iIdx)
 		Local $fSc  = ($fRi > 1e-12) ? Sqrt($fLambda0 / $fRi) : 0
 		_blas_scal($mG, $fSc, $iIdx * $iNp, 1, $iNp)
 	Next
