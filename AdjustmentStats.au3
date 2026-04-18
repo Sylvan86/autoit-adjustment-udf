@@ -526,14 +526,40 @@ Func __adj_computeCofactors(ByRef $mSystem, ByRef $mState, $mS)
 	EndIf
 
 	; standard deviations of adjusted observations and residuals
+	; numerical noise can produce slightly-negative diagonal entries (P · X · Pᵀ
+	; is theoretically PSD, but rounding breaks that). Floor at 0 before sqrt
+	; so sd_y/sd_v stays real instead of NaN.
 	If MapExists($mResults, "Qyhat") And $fS0 > 0 Then
-		$mResults.sdy = _la_scale(_la_sqrtElements(_la_getDiag($mResults.Qyhat)), $fS0)
+		Local $mDiagY = _la_getDiag($mResults.Qyhat)
+		__adj_floorAtZero($mDiagY)
+		$mResults.sdy = _la_scale(_la_sqrtElements($mDiagY), $fS0)
 	EndIf
 	If MapExists($mResults, "Qvv") And $fS0 > 0 Then
-		$mResults.sdv = _la_scale(_la_sqrtElements(_la_getDiag($mResults.Qvv)), $fS0)
+		Local $mDiagV = _la_getDiag($mResults.Qvv)
+		__adj_floorAtZero($mDiagV)
+		$mResults.sdv = _la_scale(_la_sqrtElements($mDiagV), $fS0)
 	EndIf
 
 	$mSystem.results = $mResults
+EndFunc
+
+; #INTERNAL_USE_ONLY# ===========================================================================================================
+; Name...........: __adj_floorAtZero
+; Description ...: Replaces negative vector elements with 0 in-place via the
+;                  identity max(0, x) = (x + |x|) / 2, with |x| = √(x²).
+;                  Implemented entirely through BLAS/LA primitives — no AutoIt
+;                  element loop. Guards against numerical noise that yields
+;                  slightly-negative diagonals in theoretically-PSD matrices.
+; Syntax.........: __adj_floorAtZero($mVector)
+; Parameters ....: $mVector     - [ByRef] Vector map (modified in place)
+; Return values .: None
+; Author ........: AspirinJunkie
+; ===============================================================================================================================
+Func __adj_floorAtZero(ByRef $mVector)
+	Local $mAbs = _la_squareElements($mVector, False)   ; copy: x²
+	_la_sqrtElements($mAbs, True)                        ; in-place: |x|
+	_blas_axpy($mAbs, $mVector, 1.0)                     ; mVector := x + |x|
+	_blas_scal($mVector, 0.5)                            ; mVector := (x + |x|)/2 = max(0, x)
 EndFunc
 
 ; #INTERNAL_USE_ONLY# ===========================================================================================================
