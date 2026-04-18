@@ -124,6 +124,7 @@ Global Const $__ADJ_MARQUARDT_ABS_FLOOR  = 1e-30
 ;__adj_prepareModel
 ;__adj_reverseEquilibration
 ;__adj_robustIRLS
+;__adj_runIRLSPhase
 ;__adj_robustMedian
 ;__adj_robustScale
 ;__adj_robustWeight
@@ -691,6 +692,11 @@ Func _adj_defaultConfig($sAlgorithm = "LM", $bVCE = False, $iMaxIter = $__ADJ_MA
 	$mCfg.robustParams      = Null
 	$mCfg.robustMaxIter     = 30
 	$mCfg.robustConvergence = 1e-3
+	; cascade-init (MM-estimator pattern): run Huber first, then redescending. Default ON
+	; for non-convex estimators (Biweight, Hampel, BIBER) since Huber's convex global minimum
+	; provides a much better starting point than the non-robust solve alone.
+	$mCfg.robustCascadeInit    = True
+	$mCfg.robustCascadeMaxIter = 15
 
 	; iterative data snooping (mutually exclusive with robust)
 	$mCfg.dataSnooping              = False

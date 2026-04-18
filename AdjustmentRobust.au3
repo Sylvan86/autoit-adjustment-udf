@@ -151,51 +151,46 @@ Func __adj_robustIRLS(ByRef $mSystem, ByRef $mState)
 	; weighted, the scale collapses, and ever more points are flagged as outliers.
 	$mState.Vector_ObsInvStdDev_apriori = _blas_duplicate($mState.Vector_ObsInvStdDev)
 
-	; 4. IRLS iteration loop
+	; 4. Cascade-init for non-convex (redescending) estimators: run Huber first to
+	;    converge to its convex global minimum, then hand the weights+x as starting
+	;    point to the user's redescending estimator. Standard MM-estimator pattern
+	;    (Yohai 1987, Maronna et al. 2006) that avoids garbage local minima where
+	;    Bisquare/Hampel/BIBER would otherwise collapse with poor initial residuals.
+	Local $sUserEstim = $mConfig.robust
+	Local $bRedescending = ($sUserEstim = "Biweight" Or $sUserEstim = "Hampel" Or $sUserEstim = "BIBER")
+	Local $bCascade = $bRedescending And MapExists($mConfig, "robustCascadeInit") And $mConfig.robustCascadeInit
+
+	Local $iTotalIter = 0
 	Local $bConverged = False
 	Local $fScale = 0.0
-	Local $iIterations = 0
 
-	Local $sScaleMethod = "MAD"
-	If $mConfig.robustParams <> Null Then
-		If MapExists($mConfig.robustParams, "scale") Then $sScaleMethod = $mConfig.robustParams.scale
+	If $bCascade Then
+		; ── Phase A: Huber (convex; produces robust starting point) ──
+		Local $mUserParams = $mConfig.robustParams
+		Local $iCascadeMaxIter = MapExists($mConfig, "robustCascadeMaxIter") ? $mConfig.robustCascadeMaxIter : 15
+		$mConfig.robust       = "Huber"
+		$mConfig.robustParams = _adj_robustDefaults("Huber")
+		$mSystem.config       = $mConfig
+
+		Local $mPhaseA = __adj_runIRLSPhase($mSystem, $mState, $aRedundancy, $iCascadeMaxIter)
+		If @error Then Return SetError(@error, @extended, False)
+		$iTotalIter += $mPhaseA.iterations
+
+		; restore user's estimator + tuning params for phase B
+		$mConfig.robust       = $sUserEstim
+		$mConfig.robustParams = $mUserParams
+		$mSystem.config       = $mConfig
 	EndIf
 
-	For $iIRLS = 1 To $mConfig.robustMaxIter
-		; robust scale estimation
-		$fScale = __adj_robustScale($mState, $sScaleMethod, $mConfig.robustParams)
-
-		; guard: MAD = 0 → fallback to s0
-		If $fScale < 1e-15 Then
-			Local $iDOF = $mState.nObs - $mState.nParams + $mState.nRestrictions
-			$fScale = ($iDOF > 0) ? Sqrt($mState.r2sum / $iDOF) : 0
-			If $fScale < 1e-15 Then ExitLoop  ; residuals are zero → abort
-		EndIf
-
-		; update weights + check convergence
-		$bConverged = __adj_updateRobustWeights($mSystem, $mState, $fScale, $aRedundancy)
-		$iIterations = $iIRLS
-		If $bConverged Then ExitLoop
-
-		; propagate new weights to whitening vectors
-		__adj_updateWhiteningVectors($mSystem, $mState)
-
-		; reset iteration state for fresh GN/LM convergence (mirrors VCE reset)
-		If MapExists($mState, "nIterations")      Then MapRemove($mState, "nIterations")
-		If MapExists($mState, "r_accumulated")     Then MapRemove($mState, "r_accumulated")
-		If MapExists($mState, "LM_D")              Then MapRemove($mState, "LM_D")
-		If MapExists($mState, "LM_gradient")       Then MapRemove($mState, "LM_gradient")
-		If MapExists($mState, "LM_step")           Then MapRemove($mState, "LM_step")
-		If MapExists($mState, "EquilibrationScale") Then MapRemove($mState, "EquilibrationScale")
-
-		; full GN/LM solve with updated weights
-		__adj_solveNonlinear($mSystem, $mState)
-		If @error Then Return SetError(@error, @extended, False)
-		__adj_computeResiduals($mSystem, $mState)
-	Next
+	; ── Phase B: user's chosen estimator (continues from current weights+residuals) ──
+	Local $mPhaseB = __adj_runIRLSPhase($mSystem, $mState, $aRedundancy, $mConfig.robustMaxIter)
+	If @error Then Return SetError(@error, @extended, False)
+	$iTotalIter += $mPhaseB.iterations
+	$bConverged  = $mPhaseB.converged
+	$fScale      = $mPhaseB.scale
 
 	; 5. Store IRLS results in state
-	$mState.robustIterations = $iIterations
+	$mState.robustIterations = $iTotalIter
 	$mState.robustScale = $fScale
 	$mState.robustConverged = $bConverged
 
@@ -206,6 +201,67 @@ Func __adj_robustIRLS(ByRef $mSystem, ByRef $mState)
 		$mRobustWeights[$sObsName] = ($mObs2[$sObsName])._robustWeight
 	Next
 	$mState.robustWeights = $mRobustWeights
+EndFunc
+
+; #INTERNAL_USE_ONLY# ===========================================================================================================
+; Name...........: __adj_runIRLSPhase
+; Description ...: Inner IRLS loop, factored out so cascade-init can run it twice
+;                  (Huber first, then user's redescending estimator). Reads the active
+;                  estimator and tuning params from $mSystem.config.robust /
+;                  .robustParams — the orchestrator switches those between phases.
+; Syntax.........: __adj_runIRLSPhase($mSystem, $mState, $aRedundancy, $iMaxIter)
+; Parameters ....: $mSystem     - [ByRef] The adjustment system (config selects estimator)
+;                  $mState      - [ByRef] Solver state (residuals updated in place)
+;                  $aRedundancy - Redundancy diagonal array (BIBER/ModifiedM only) or Null
+;                  $iMaxIter    - Maximum IRLS iterations for this phase
+; Return values .: Map with .iterations, .converged, .scale; @error on solver failure
+; Author ........: AspirinJunkie
+; ===============================================================================================================================
+Func __adj_runIRLSPhase(ByRef $mSystem, ByRef $mState, $aRedundancy, $iMaxIter)
+	Local $mConfig = $mSystem.config
+	Local $bConverged = False
+	Local $fScale = 0.0
+	Local $iIterations = 0
+
+	Local $sScaleMethod = "MAD"
+	If $mConfig.robustParams <> Null Then
+		If MapExists($mConfig.robustParams, "scale") Then $sScaleMethod = $mConfig.robustParams.scale
+	EndIf
+
+	For $iIRLS = 1 To $iMaxIter
+		$fScale = __adj_robustScale($mState, $sScaleMethod, $mConfig.robustParams)
+
+		; guard: MAD = 0 → fallback to s0
+		If $fScale < 1e-15 Then
+			Local $iDOF = $mState.nObs - $mState.nParams + $mState.nRestrictions
+			$fScale = ($iDOF > 0) ? Sqrt($mState.r2sum / $iDOF) : 0
+			If $fScale < 1e-15 Then ExitLoop  ; residuals are zero → abort
+		EndIf
+
+		$bConverged = __adj_updateRobustWeights($mSystem, $mState, $fScale, $aRedundancy)
+		$iIterations = $iIRLS
+		If $bConverged Then ExitLoop
+
+		__adj_updateWhiteningVectors($mSystem, $mState)
+
+		; reset iteration state for fresh GN/LM convergence (mirrors VCE reset)
+		If MapExists($mState, "nIterations")      Then MapRemove($mState, "nIterations")
+		If MapExists($mState, "r_accumulated")     Then MapRemove($mState, "r_accumulated")
+		If MapExists($mState, "LM_D")              Then MapRemove($mState, "LM_D")
+		If MapExists($mState, "LM_gradient")       Then MapRemove($mState, "LM_gradient")
+		If MapExists($mState, "LM_step")           Then MapRemove($mState, "LM_step")
+		If MapExists($mState, "EquilibrationScale") Then MapRemove($mState, "EquilibrationScale")
+
+		__adj_solveNonlinear($mSystem, $mState)
+		If @error Then Return SetError(@error, @extended, Null)
+		__adj_computeResiduals($mSystem, $mState)
+	Next
+
+	Local $mRet[]
+	$mRet.iterations = $iIterations
+	$mRet.converged  = $bConverged
+	$mRet.scale      = $fScale
+	Return $mRet
 EndFunc
 
 ; #INTERNAL_USE_ONLY# ===========================================================================================================
