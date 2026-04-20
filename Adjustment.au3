@@ -611,11 +611,15 @@ EndFunc
 ; Parameters ....: $mSystem     - [ByRef] The adjustment system
 ;                  $sParam      - Parameter name (case-insensitive)
 ;                  $fValue      - Initial/approximate value
-; Return values .: Success      - True
-;                  Failure      - SetError($ADJ_ERR_INPUT) if parameter not found
+; Return values .: True
 ; Author ........: AspirinJunkie
 ; Modified.......:
 ; Remarks .......: Required for nonlinear models where parameters need starting values for iteration.
+;                  May be called either before or after _adj_addObsFunction/_adj_addFunction:
+;                  if the parameter is not yet registered, it is created with this value;
+;                  otherwise its existing value is overwritten. A later add*-call that references
+;                  the same name keeps the value set here (addObsFunction/addFunction only assign
+;                  $fParamInitValue for parameters not already present).
 ; Related .......: _adj_addObsFunction, _adj_addFunction
 ; Link ..........:
 ; Example .......: No
@@ -623,8 +627,9 @@ EndFunc
 Func _adj_setInitialValue(ByRef $mSystem, $sParam, $fValue)
 	Local $mModel = $mSystem.model
 	Local $mParams = $mModel.params
-	If Not MapExists($mParams, StringUpper($sParam)) Then Return SetError($ADJ_ERR_INPUT, 0, False)
-	$mParams[StringUpper($sParam)] = $fValue
+	Local $sKey = StringUpper($sParam)
+	If Not MapExists($mParams, $sKey) Then $mModel.nParams += 1
+	$mParams[$sKey] = $fValue
 	$mModel.params = $mParams
 	$mSystem.model = $mModel ;! MAP WRITE-BACK
 
