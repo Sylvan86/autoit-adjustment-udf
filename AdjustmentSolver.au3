@@ -137,6 +137,7 @@ Func __adj_estimateVCE(ByRef $mSystem, ByRef $mState)
 
 			; Step 2+3: per-group vᵀPv_k and σ̂²_k
 			$bConverged = True
+			Local $bAnyClippedCov = False
 			Local $mVCELastSigma2 = MapExists($mState, "vceLastSigma2") ? $mState.vceLastSigma2 : Null
 
 			For $sGroup In MapKeys($mGroupOffsets)
@@ -159,7 +160,10 @@ Func __adj_estimateVCE(ByRef $mSystem, ByRef $mState)
 				; floor at $__ADJ_VCE_MIN_SIGMA2 instead of resetting to 1.0 (which would
 				; throw away the partial information that the group's variance is in fact small)
 				$bClipped = ($fSigmaSq < $__ADJ_VCE_MIN_SIGMA2)
-				If $bClipped Then $fSigmaSq = $__ADJ_VCE_MIN_SIGMA2
+				If $bClipped Then
+					$fSigmaSq = $__ADJ_VCE_MIN_SIGMA2
+					$bAnyClippedCov = True
+				EndIf
 
 				; store per-group results
 				$mGrp = Null
@@ -171,10 +175,14 @@ Func __adj_estimateVCE(ByRef $mSystem, ByRef $mState)
 				$mGrpCov.clipped = $bClipped
 				$mGroupResults[$sGroup] = $mGrpCov
 
-				; convergence test: |σ̂²_k - σ̂²_k_old| / σ̂²_k_old < 0.05
-				Local $fOld = 1.0
-				If IsMap($mVCELastSigma2) And MapExists($mVCELastSigma2, $sGroup) Then $fOld = $mVCELastSigma2[$sGroup]
-				If Abs($fSigmaSq - $fOld) / $fOld >= 0.05 Then $bConverged = False
+				; Clipped groups are frozen (see Helmert branch rationale): treat as
+				; converged, don't let them drive further iteration.
+				If Not $bClipped Then
+					; convergence test: |σ̂²_k - σ̂²_k_old| / σ̂²_k_old < 0.05
+					Local $fOld = 1.0
+					If IsMap($mVCELastSigma2) And MapExists($mVCELastSigma2, $sGroup) Then $fOld = $mVCELastSigma2[$sGroup]
+					If Abs($fSigmaSq - $fOld) / $fOld >= 0.05 Then $bConverged = False
+				EndIf
 
 				; store for next iteration
 				If Not IsMap($mVCELastSigma2) Then
@@ -185,13 +193,29 @@ Func __adj_estimateVCE(ByRef $mSystem, ByRef $mState)
 			Next
 			$mState.vceLastSigma2 = $mVCELastSigma2
 
+			; Clipping means the per-group fixed point σ̂²_k = 1 is not
+			; identifiable for this model (e.g. X/Y grouping in parametrized
+			; Gauss–Helmert). Freezing the clipped block and reporting
+			; convergence would yield an illusory "s0=1 in all groups" while
+			; one group has collapsed against the floor. Report non-convergence
+			; so callers can distinguish this from a genuine VCE result.
+			If $bAnyClippedCov Then
+				$bConverged = False
+				ExitLoop
+			EndIf
+
 			; Step 4: rebuild Σₗₗ from original with block-scaling
+			; Clipped groups: skip scaling (factor=1 ≡ keep original block) to avoid
+			; shrinking the Σ-block to ~1e-6 and cascading the residual collapse.
 			Local $mSigmaNew = _la_duplicate($mState.Matrix_Sigma_Original)
 			For $sGroup In MapKeys($mGroupOffsets)
+				Local $mGrpRes = $mGroupResults[$sGroup]
+				If $mGrpRes.clipped Then ContinueLoop
+
 				$mOff = $mGroupOffsets[$sGroup]
 				$iStart = $mOff.start
 				$iCount = $mOff.count
-				$fSigmaSq = ($mGroupResults[$sGroup]).sigma2
+				$fSigmaSq = $mGrpRes.sigma2
 
 				; extract block, scale, write back via _lp_lacpy
 				Local $mBlock = _la_extractBlock($mSigmaNew, $iStart + 1, $iStart + 1, $iStart + $iCount, $iStart + $iCount)
@@ -236,6 +260,7 @@ Func __adj_estimateVCE(ByRef $mSystem, ByRef $mState)
 		$mObservations = $mModel.obs
 		$mIdxObs = $mState.idxObs
 
+		Local $bAnyClippedHelmert = False
 		For $sGroup In MapKeys($mGroupIndices)
 			$aIdx = $mGroupIndices[$sGroup]
 
@@ -262,6 +287,7 @@ Func __adj_estimateVCE(ByRef $mSystem, ByRef $mState)
 			$bClipped = ($fSigmaSq < $__ADJ_VCE_MIN_SIGMA2)
 			If $bClipped Then
 				$fSigmaSq = $__ADJ_VCE_MIN_SIGMA2
+				$bAnyClippedHelmert = True
 			EndIf
 
 			; store per-group VCE results (overwritten each iteration, final values kept)
@@ -272,21 +298,34 @@ Func __adj_estimateVCE(ByRef $mSystem, ByRef $mState)
 			$mGrp.clipped = $bClipped
 			$mGroupResults[$sGroup] = $mGrp
 
-			; convergence test: |1 - σ̂²_k| < 0.05
-			If Abs(1 - $fSigmaSq) >= 0.05 Then $bConverged = False
+			; Clipped groups are frozen: residuals carry no reliable variance signal.
+			; Treat as converged and skip weight scaling — otherwise scaling by 1/1e-6
+			; would blow up weights iteratively and cascade the residuals to zero.
+			If Not $bClipped Then
+				; convergence test: |1 - σ̂²_k| < 0.05
+				If Abs(1 - $fSigmaSq) >= 0.05 Then $bConverged = False
 
-			; update weights: pᵢ,neu = pᵢ / σ̂²_k
-			For $j = 0 To UBound($aIdx) - 1
-				$iIdx = $aIdx[$j]
-				Local $sName = $aIdxToName[$iIdx]
-				Local $mObs = $mObservations[$sName]
-				$mObs.weight = $mObs.weight / $fSigmaSq
-				$mObservations[$sName] = $mObs
-			Next
+				; update weights: pᵢ,neu = pᵢ / σ̂²_k
+				For $j = 0 To UBound($aIdx) - 1
+					$iIdx = $aIdx[$j]
+					Local $sName = $aIdxToName[$iIdx]
+					Local $mObs = $mObservations[$sName]
+					$mObs.weight = $mObs.weight / $fSigmaSq
+					$mObservations[$sName] = $mObs
+				Next
+			EndIf
 		Next
 
 		$mModel.obs = $mObservations
 		$mSystem.model = $mModel ;! MAP WRITE-BACK
+
+		; Clipping = non-identifiable VCE fixed point (see Covariance branch).
+		; Report non-convergence instead of the illusory "all groups at σ²=1"
+		; produced by freezing the collapsed group.
+		If $bAnyClippedHelmert Then
+			$bConverged = False
+			ExitLoop
+		EndIf
 
 		; update whitening vectors from new weights (Step 6.4)
 		; σᵢ,eff = 1/√pᵢ, 1/σᵢ,eff = √pᵢ

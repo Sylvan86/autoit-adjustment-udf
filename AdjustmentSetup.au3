@@ -431,7 +431,10 @@ Func __adj_classifyModel(ByRef $mSystem)
 		Else
 			$sAdjModel = $mModel._hasParamRestrictions ? "GLSE" : "GLS"
 		EndIf
-	ElseIf $mModel._isWeighted Then
+	ElseIf $mModel._isWeighted Or $mModel._multiVarComp Then
+		; _multiVarComp → VKS aktiv: auch bei initialen σ=1 muss der gewichtete
+		; Code-Pfad gewählt werden, sonst laufen die von VKS erzeugten
+		; Gewichtsänderungen ins Leere (σ̂²_k bleibt konstant bei 1).
 		If $mModel._hasObsFunctions Or $mModel._hasObsRestrictions Then
 			$sAdjModel = $mModel.nParams = 0 ? "WCLS" : "WGLM"
 		Else
